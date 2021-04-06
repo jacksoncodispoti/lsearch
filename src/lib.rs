@@ -250,7 +250,12 @@ pub mod search {
     }
     impl ContentLoader for TextLoader {
         fn load_content(&self, entry: &walkdir::DirEntry) -> String {
-            fs::read_to_string(entry.path()).unwrap()
+            if entry.path().is_dir() {
+                return String::new();
+            }
+            else{
+                fs::read_to_string(entry.path()).unwrap()
+            }
         }
     }
 
