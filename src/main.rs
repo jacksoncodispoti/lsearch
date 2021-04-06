@@ -1,21 +1,32 @@
-use clap::{App};
-use std::path::Path;
-use lsearch::search;
+use std::env;
+use lsearch::cli;
 
 fn main() {
-    let _matches = App::new("L-Search")
-        .version("0.0.1")
-        .author("Alerik <alerik@alerik.de>")
-        .about("Search through ALL files");
+   // let matches = App::new("L-Search")
+   //     .version("0.0.1")
+   //     .author("Alerik <alerik@alerik.de>")
+   //     .about("Search through ALL files")
+   //     .arg(Arg::new("more")
+   //      .short('m')
+   //      .long("more")
+   //      .multiple(true)
+   //      .about("A scorer to increase based on word count")
+   //      .takes_value(true))
+   //     .arg(Arg::new("less")
+   //      .short('l')
+   //      .long("less")
+   //      .multiple(true)
+   //      .about("A scorer to decrease based on word count")
+   //      .takes_value(true))
+   //     .arg(Arg::new("than")
+   //      .short('t')
+   //      .long("than")
+   //      .multiple(true)
+   //      .about("Use in conjunction with --more and --less")
+   //      .takes_value(true));
+        //.get_matches();
 
-    let path = Path::new("./");
-    //let spec = search::DirScoreSpec{is_dir:false};
-    //let spec = search::PermissionScoreSpec{permission: 0o777};
-    let spec = search::PermissionScoreSpec{permission: 0o644};
-    let scored_files = search::metadata_search(&path, &spec);
+    let result: Vec<String> = env::args().collect();
 
-    for file in scored_files {
-        let path = file.entry.path().into_os_string().into_string().unwrap();
-        println!("{} [{}]", path, file.score);
-    }
+    cli::process_command(result);
 }
