@@ -146,13 +146,22 @@ pub mod cli {
             }
 
             let mut score = 0.0;
+            let mut okay = true;
 
             for cmd in commands {
                 let content = String::from(cmd.content);
-                score += cmd.scorer.score(&content);
+                let local_score = cmd.scorer.score(&content);
+                score += local_score;
+
+                if local_score == 0.0 {
+                    okay = false;
+                    break;
+                }
             }
 
-            results.push((score, String::from(direntry.path().as_os_str().to_str().unwrap())));
+            if okay {
+                results.push((score, String::from(direntry.path().as_os_str().to_str().unwrap())));
+            }
             ////Filtered out
             //if score / 1.0 * scorers < 1.0 {
 
