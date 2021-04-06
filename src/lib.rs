@@ -153,7 +153,7 @@ pub mod cli {
                 let local_score = cmd.scorer.score(&content);
                 score += local_score;
 
-                if local_score == 0.0 {
+                if local_score < 1.0 {
                     okay = false;
                     break;
                 }
@@ -176,12 +176,10 @@ pub mod cli {
 
         for result in results.iter().rev() {
             if result.0 >= 1.0 {
-                println!("{}", result.1)
             }
             else {
 
             }
-            //println!("{} {}", result.1, result.0);
         }
 
         0
