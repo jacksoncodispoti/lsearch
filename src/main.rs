@@ -30,5 +30,5 @@ fn main() {
 
     let result: Vec<String> = env::args().collect();
 
-    cli::cli::process_command(result);
+    cli::process_command(result);
 }
