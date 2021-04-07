@@ -2,10 +2,6 @@ pub mod cli {
     use crate::search::{self, SuperContentScorer, ContentLoader};
     use std::collections::HashMap;
 
-    fn get_default_content_loader() -> Box<dyn ContentLoader> {
-        Box::new(search::TextLoader::new())
-    }
-
     fn get_content_loaders(args: std::slice::Iter<String>) -> HashMap<String, Box<dyn ContentLoader>> {
         let mut content_loaders: HashMap<String, Box<dyn ContentLoader>> = HashMap::new();
 
@@ -25,6 +21,12 @@ pub mod cli {
             if arg == "--content-path" {
                 if !content_loaders.contains_key(&String::from(arg)) {
                     content_loaders.insert(String::from(arg), Box::new(search::PathLoader::new()));
+                }
+            }
+            
+            if arg == "--content-ext" {
+                if !content_loaders.contains_key(&String::from(arg)) {
+                    content_loaders.insert(String::from(arg), Box::new(search::ExtLoader::new()));
                 }
             }
         }
@@ -78,15 +80,13 @@ pub mod cli {
     use walkdir::WalkDir;
     pub fn process_command(args: Vec<String>) -> u32 {
         //let command_order = process_command_order(args);
-        let mut iter = args.iter().peekable();
         let content_loaders = get_content_loaders(args.iter());
         let mut current_loader = "--content-text";
-        
+
         let mut results: Vec<(f32, String)> = Vec::new();
 
 
         for direntry in WalkDir::new(".") {
-            let mut scorers = 0.0;
             let direntry = direntry.unwrap();
             let mut commands: Vec::<SuperContentScorer> = Vec::new();
             let mut iter = args.iter();
@@ -95,15 +95,7 @@ pub mod cli {
                 //println!("MASTER {}", arg);
                 //while let Some(arg) = iter.next() {
                 if arg.starts_with("--content") {
-                    if arg == "--content-text" {
                         current_loader = arg;
-                    }
-                    if arg == "--content-title" {
-                        current_loader = arg;
-                    } 
-                    if arg == "--content-path" {
-                        current_loader = arg;
-                    }
                     continue;
                 }
 
@@ -117,7 +109,6 @@ pub mod cli {
                         },
                         None => { panic!("Expected a term after more"); }
                     }
-                    scorers += 1.0;
                 }
                 else if arg == "--is" {
                     match iter.next() {
@@ -129,7 +120,6 @@ pub mod cli {
                         },
                         None => { panic!("Expected a term after more"); }
                     }
-                    scorers += 1.0;
                 }
                 else if arg == "--has" {
                     match iter.next() {
@@ -141,7 +131,6 @@ pub mod cli {
                         },
                         None => { panic!("Expected a term after more"); }
                     }
-                    scorers += 1.0;
                 }
             }
 
@@ -176,6 +165,7 @@ pub mod cli {
 
         for result in results.iter().rev() {
             if result.0 >= 1.0 {
+                println!("{}", result.1);
             }
             else {
 
@@ -234,6 +224,25 @@ pub mod search {
         }
     }
 
+    pub struct ExtLoader {
+        pub content: String,
+    }
+
+    impl ExtLoader {
+        pub fn new() -> ExtLoader {
+            ExtLoader{content: String::new()}
+        }
+    }
+
+    impl ContentLoader for ExtLoader {
+        fn load_content(&self, entry: &walkdir::DirEntry) -> String {
+            match entry.path().extension() {
+                Some(ext) => { return String::from(ext.to_str().unwrap());}
+                    None => { return String::from(""); }
+            }
+        }
+    }
+
     #[derive(Debug)]
     pub struct TextLoader { 
         content: String
@@ -242,8 +251,6 @@ pub mod search {
     impl TextLoader {
         pub fn new() -> TextLoader {
             TextLoader{content: String::new()}
-        }
-        fn load_content(&self, entry: &walkdir::DirEntry) {
         }
     }
     impl ContentLoader for TextLoader {
@@ -296,7 +303,6 @@ pub mod search {
                 return -1.0
             }
         }
-
     }
 
     pub struct More {
@@ -432,7 +438,6 @@ pub mod search {
                 vec.push(ScoredDirEntry{entry: entry, score: score});
             }
         }
-
         vec
     }
 }
