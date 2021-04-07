@@ -1,5 +1,7 @@
 use std::env;
-use lsearch::cli;
+
+mod cli;
+mod search;
 
 fn main() {
    // let matches = App::new("L-Search")
@@ -28,5 +30,5 @@ fn main() {
 
     let result: Vec<String> = env::args().collect();
 
-    cli::process_command(result);
+    cli::cli::process_command(result);
 }
