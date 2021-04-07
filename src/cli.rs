@@ -33,20 +33,20 @@ fn get_content_loaders(args: std::slice::Iter<String>) -> HashMap<String, Box<dy
 
     //Add default if none
     if content_loaders.len() == 0 {
-        content_loaders.insert(String::from("--content-text"), Box::new(search::loaders::TitleLoader::new()));
+        content_loaders.insert(String::from("--content-text"), Box::new(search::loaders::TextLoader::new()));
     }
 
     content_loaders
 }
 
-pub fn process_command(args: Vec<String>) -> u32 {
+pub fn process_command(path: &str, args: Vec<String>) -> u32 {
     //let command_order = process_command_order(args);
     let content_loaders = get_content_loaders(args.iter());
     let mut current_loader = "--content-text";
 
     let mut results: Vec<(f32, String)> = Vec::new();
 
-    for direntry in WalkDir::new(".") {
+    for direntry in WalkDir::new(path) {
         let direntry = direntry.unwrap();
         let mut commands: Vec::<search::scorers::SuperContentScorer> = Vec::new();
         let mut iter = args.iter();
