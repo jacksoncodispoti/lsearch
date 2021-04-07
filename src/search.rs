@@ -5,11 +5,10 @@ pub mod loaders {
     }
 
     pub struct TitleLoader { 
-        pub content: String,
     }
     impl TitleLoader {
         pub fn new() -> TitleLoader {
-            TitleLoader{content: String::new()}
+            TitleLoader{}
         }
     }
     impl ContentLoader for TitleLoader {
@@ -19,11 +18,10 @@ pub mod loaders {
     }
 
     pub struct PathLoader {
-        pub content: String,
     }
     impl PathLoader {
         pub fn new() -> PathLoader {
-            PathLoader{content: String::new()}
+            PathLoader{}
         }
     }
     impl ContentLoader for PathLoader {
@@ -33,11 +31,10 @@ pub mod loaders {
     }
 
     pub struct ExtLoader {
-        pub content: String,
     }
     impl ExtLoader {
         pub fn new() -> ExtLoader {
-            ExtLoader{content: String::new()}
+            ExtLoader{}
         }
     }
     impl ContentLoader for ExtLoader {
@@ -50,11 +47,10 @@ pub mod loaders {
     }
 
     pub struct TextLoader { 
-        content: String
     }
     impl TextLoader {
         pub fn new() -> TextLoader {
-            TextLoader{content: String::new()}
+            TextLoader{}
         }
     }
     impl ContentLoader for TextLoader {
@@ -95,7 +91,6 @@ pub mod scorers {
             }
         }
     }
-
 
     pub struct Is {
         pub target: String
