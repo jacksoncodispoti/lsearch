@@ -106,6 +106,20 @@ pub mod scorers {
         }
     }
 
+    pub struct Not {
+        pub target: String
+    }
+    impl ContentFilter for Not {
+        fn filter(&self, content: &String) -> bool {
+            !self.target.eq(content)
+        }
+    }
+    impl ContentScorer for Not {
+        fn score(&self, content: &String) -> f32 {
+            if self.filter(&content) {1.0} else {0.0}
+        }
+    }
+
     pub struct Has {
         pub target: String
     }
@@ -118,6 +132,23 @@ pub mod scorers {
         }
     }
     impl ContentScorer for Has {
+        fn score(&self, content: &String) -> f32 {
+            if self.filter(&content) {1.0} else {0.0}
+        }
+    }
+
+    pub struct Hasnt {
+        pub target: String
+    }
+    impl ContentFilter for Hasnt {
+        fn filter(&self, content: &String) -> bool {
+            for _m in content.matches(&self.target) {
+                return false
+            }
+            true
+        }
+    }
+    impl ContentScorer for Hasnt {
         fn score(&self, content: &String) -> f32 {
             if self.filter(&content) {1.0} else {0.0}
         }
