@@ -3,8 +3,8 @@ use std::path::Path;
 use std::cmp;
 use std::os::unix::fs::MetadataExt;
 
-pub trait MetadataScorer {
-    fn score(&self, meta_data: &fs::Metadata) -> f32;
+pub mod Scorers {
+
 }
 
 use walkdir;
@@ -204,60 +204,3 @@ impl PartialEq for ScoredDirEntry {
 }
 
 impl Eq for ScoredDirEntry {}
-
-pub struct PermissionScoreSpec {
-    pub permission: u32,
-}
-
-pub struct DirScoreSpec {
-    pub is_dir: bool,
-}
-
-impl MetadataScorer for PermissionScoreSpec {
-    fn score(&self, metadata: &fs::Metadata) -> f32 {
-        println!("{}",metadata.mode());
-        if metadata.mode() == self.permission{
-            1.0
-        }
-        else {
-            0.0
-        }
-    }
-}
-
-impl MetadataScorer for DirScoreSpec {
-    fn score(&self, metadata: &fs::Metadata) -> f32 {
-        if metadata.is_dir() == self.is_dir {
-            1.0
-        }
-        else {
-            0.0
-        }
-    }
-}
-
-pub fn metadata_search(root_dir: &Path, spec: &impl MetadataScorer) -> Vec<ScoredDirEntry> {
-    let mut scored_files = metadata_score_files(&root_dir, spec);
-    scored_files.sort();
-    scored_files.reverse();
-    scored_files
-}
-
-fn metadata_score_files(root_dir: &Path, spec: &impl MetadataScorer) -> Vec<ScoredDirEntry> {
-    let mut vec: Vec<ScoredDirEntry> = vec![];
-
-    if root_dir.is_dir() {
-        for entry in fs::read_dir(root_dir).unwrap() {
-            let entry = match entry {
-                Ok(file) => file,
-                Err(error) => panic!("Problem reading the file {:?}", error),
-            };
-
-            let metadata = entry.metadata().unwrap();
-            let score = spec.score(&metadata);
-
-            vec.push(ScoredDirEntry{entry: entry, score: score});
-        }
-    }
-    vec
-}
