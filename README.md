@@ -39,15 +39,15 @@ Below are the content scorers in lsearch:
 
 |Scorer|Definition|
 |---|---|
-|--more <arg>|sum(1 for <arg> in content)|
+|--more [arg]|sum(1 for [arg] in content)|
 
 ## Content Filters
 Below are some content filters:
 
 |Filter|Definition|
 |---|--|
-|--is <arg>|content == <arg>|
-|--not <arg>|content != <arg>|
-|--has <arg>| <arg> in content |
-|--hasnt <arg>| <arg> not in content|
+|--is [arg]|content == [arg]|
+|--not [arg]|content != [arg]|
+|--has [arg]| [arg] in content |
+|--hasnt [arg]| [arg] not in content|
 
