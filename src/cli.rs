@@ -11,7 +11,7 @@ mod stats {
         n: usize
     }
 
-   impl RunStats {
+    impl RunStats {
         pub fn add_operation(&mut self, operation: String) {
             if self.operations.contains_key(&operation) {
                 let next = self.operations.get(&operation).unwrap() + 1;
@@ -33,7 +33,7 @@ mod stats {
                 n: 0
             }
         }
-   }
+    }
 }
 
 fn get_content_loaders(loaders: std::slice::Iter<String>) -> HashMap<String, Box<dyn search::loaders::ContentLoader>> {
@@ -41,33 +41,15 @@ fn get_content_loaders(loaders: std::slice::Iter<String>) -> HashMap<String, Box
 
     for loader in loaders {
         //Path based
-        if loader == "--content-path" {
-            if !content_loaders.contains_key(&String::from(loader)) {
-                content_loaders.insert(String::from(loader), Box::new(search::loaders::PathLoader::new()));
-            }
+        if !content_loaders.contains_key(&String::from(loader)) {
+            content_loaders.insert(String::from(loader), 
+                    match loader.as_str() {
+                        "--content-path" => Box::new(search::loaders::PathLoader::new()),
+                        "--content-title" => Box::new(search::loaders::TitleLoader::new()),
+                        "--content-ext" => Box::new(search::loaders::ExtLoader::new()),
+                        _ =>  Box::new(search::loaders::TextLoader::new())
+            });
         }
-        else if loader == "--content-title" {
-            if !content_loaders.contains_key(&String::from(loader)) {
-                content_loaders.insert(String::from(loader), Box::new(search::loaders::TitleLoader::new()));
-            }
-        }
-        else if loader == "--content-ext" {
-            if !content_loaders.contains_key(&String::from(loader)) {
-                content_loaders.insert(String::from(loader), Box::new(search::loaders::ExtLoader::new()));
-            }
-        }
-
-        //Content-based
-        else if loader == "--content-text" {
-            if !content_loaders.contains_key(&String::from(loader)){
-                content_loaders.insert(String::from(loader), Box::new(search::loaders::TextLoader::new()));
-            }
-        }
-    }
-
-    //Add default if none
-    if content_loaders.len() == 0 {
-        content_loaders.insert(String::from("--content-text"), Box::new(search::loaders::TextLoader::new()));
     }
 
     content_loaders
@@ -115,23 +97,15 @@ fn get_content_runs(args: std::slice::Iter<String>) -> Vec<ContentRun> {
                 continue;
             }
 
-            scorer = Box::new(search::scorers::Pass{});
-            //Filter/Scorer
-            if arg == "--is" {
-                scorer = Box::new(search::scorers::Is{});
-            }
-            else if arg == "--not" {
-                scorer = Box::new(search::scorers::Not{});
-            }
-            else if arg == "--has" {
-                scorer = Box::new(search::scorers::Has{});
-            }
-            else if arg == "--hasnt" {
-                scorer = Box::new(search::scorers::Hasnt{});
-            }
-            else if arg == "--more" {
-                scorer = Box::new(search::scorers::More{});
-            }
+            scorer = match arg.as_str() {
+                //Filter/Scorer
+                "--is" => Box::new(search::scorers::Is{}),
+                "--not" => Box::new(search::scorers::Not{}),
+                "--has" => Box::new(search::scorers::Has{}),
+                "--hasnt" => Box::new(search::scorers::Hasnt{}),
+                "--more" => Box::new(search::scorers::More{}),
+                _ => Box::new(search::scorers::Pass{})
+            };
 
             current_run.scorers.push(scorer);
             continue;
@@ -154,7 +128,7 @@ fn get_content_runs(args: std::slice::Iter<String>) -> Vec<ContentRun> {
 fn summarize_runs(runs: std::slice::Iter<ContentRun>) {
     for run in runs {
         println!("Content: {}", run.content_loader);
-        
+
         for (scorer, target) in run.scorers.iter().zip(run.targets.iter()) {
             println!("\t{}({})", scorer.get_name(), target);
         }
@@ -220,6 +194,5 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
     if args.contains(&String::from("--stats")) {
         println!("{:?}", content_run_stats);
     }
-
     0
 }
