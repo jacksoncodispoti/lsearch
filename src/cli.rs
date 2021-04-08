@@ -18,6 +18,9 @@ mod stats {
                 let next = self.operations.get(&operation).unwrap() + 1;
                 self.operations.insert(operation, next);
             }
+            else{
+                self.operations.insert(operation, 1);
+            }
         }
         pub fn add_length(&mut self, length: usize) {
             self.avg_length = (self.n as f32 * self.avg_length as f32 + length as f32) / (self.n as f32 + 1.0);

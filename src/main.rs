@@ -1,5 +1,6 @@
 use std::env;
 use clap::{Arg, App};
+use std::collections::HashMap;
 
 mod cli;
 mod search;
