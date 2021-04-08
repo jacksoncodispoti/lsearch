@@ -176,7 +176,10 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
     let mut next_directories: Vec<(f32, walkdir::DirEntry)> = Vec::new();
     let mut content_run_stats: Vec<stats::RunStats> = Vec::new();
 
-    summarize_runs(runs.iter());
+
+    if args.contains(&String::from("--strats")) {
+        summarize_runs(runs.iter());
+    }
 
     for run in runs {
         let mut run_stats = stats::RunStats::new();
@@ -211,9 +214,8 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
         content_run_stats.push(run_stats);
     }
 
-    println!("RESULTS");
     for direntry in directories {
-        println!("{:?}", direntry.path());
+        println!("{}", direntry.path().as_os_str().to_str().unwrap());
     }
 
     if args.contains(&String::from("--stats")) {
