@@ -156,6 +156,8 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
             let mut score = 0.0;
             for (scorer, target) in run.scorers.iter().zip(run.targets.iter()) {
                 let ind_score = scorer.score(&content, &target);
+                if content.len() < 40{
+                }
                 score += ind_score; 
 
                 if ind_score < 1.0 {
@@ -174,6 +176,7 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
         directories = next_directories.into_iter().map(|x| x.1).collect();
     }
 
+    println!("RESULTS");
     for direntry in directories {
         println!("{:?}", direntry.path());
     }

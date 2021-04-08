@@ -64,7 +64,6 @@ pub mod loaders {
                 return String::new();
             }
             else{
-                println!("{}", entry.path().to_str().unwrap());
                 let mut contents = String::new();
                 let file = File::open(String::from(entry.path().to_str().unwrap())).unwrap();
                 let mut buf_reader = BufReader::new(file);
