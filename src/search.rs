@@ -82,15 +82,6 @@ pub mod scorers {
     pub trait ContentFilter {
         fn filter(&self, content: &String, target: &String) -> bool;
     }
-    pub struct SuperContentScorer<'a> {
-        pub scorer: Box<dyn ContentScorer>,
-        pub content: &'a str,
-    }
-    impl SuperContentScorer<'_> {
-        pub fn new<'a>(scorer: Box<dyn ContentScorer>, content: &'a str) -> SuperContentScorer<'a> {
-            SuperContentScorer{scorer: scorer, content: content}
-        }
-    }
 
     pub struct Is {
     }

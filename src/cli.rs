@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use crate::search;
 use walkdir::WalkDir;
-use std::fmt;
 
 mod stats {
     use std::collections::HashMap;
@@ -221,17 +220,6 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
     if args.contains(&String::from("--stats")) {
         println!("{:?}", content_run_stats);
     }
-
-    //results.sort_by(|a, b| a.partial_cmp(b).unwrap());
-
-    //for result in results.iter().rev() {
-    //    if result.0 >= 1.0 {
-    //        println!("{}", result.1);
-    //    }
-    //    else {
-
-    //    }
-    //}
 
     0
 }
