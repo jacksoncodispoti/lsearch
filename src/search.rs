@@ -167,7 +167,7 @@ pub mod scorers {
     }
     impl ContentScorer for More {
         fn score(&self, content: &String, target: &String) -> f32 {
-            let mut score = 0.0;
+            let mut score = 1.0;
 
             for _m in content.matches(target) {
                 score += 1.0;
