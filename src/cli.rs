@@ -3,6 +3,37 @@ use crate::search;
 use walkdir::WalkDir;
 use std::fmt;
 
+mod stats {
+    use std::collections::HashMap;
+    #[derive(Debug)]
+    pub struct RunStats {
+        operations: HashMap<String, u32>,
+        avg_length: f32,
+        n: usize
+    }
+
+   impl RunStats {
+        pub fn add_operation(&mut self, operation: String) {
+            if self.operations.contains_key(&operation) {
+                let next = self.operations.get(&operation).unwrap() + 1;
+                self.operations.insert(operation, next);
+            }
+        }
+        pub fn add_length(&mut self, length: usize) {
+            self.avg_length = (self.n as f32 * self.avg_length as f32 + length as f32) / (self.n as f32 + 1.0);
+            self.n += 1;
+        }
+
+        pub fn new() -> RunStats {
+            RunStats {
+                operations: HashMap::new(), 
+                avg_length: 0.0, 
+                n: 0
+            }
+        }
+   }
+}
+
 fn get_content_loaders(loaders: std::slice::Iter<String>) -> HashMap<String, Box<dyn search::loaders::ContentLoader>> {
     let mut content_loaders: HashMap<String, Box<dyn search::loaders::ContentLoader>> = HashMap::new();
 
@@ -79,7 +110,6 @@ fn get_content_runs(args: std::slice::Iter<String>) -> Vec<ContentRun> {
                 }
 
                 current_run = ContentRun{content_loader: String::from(current_loader), scorers: Vec::new(), targets: Vec::new()};
-                println!("Current loader update to {}", current_loader);
                 continue;
             }
 
@@ -102,7 +132,6 @@ fn get_content_runs(args: std::slice::Iter<String>) -> Vec<ContentRun> {
             }
 
             current_run.scorers.push(scorer);
-            println!("Pushing scorer");
             continue;
         }
 
@@ -142,10 +171,12 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
         .collect();
 
     let mut next_directories: Vec<(f32, walkdir::DirEntry)> = Vec::new();
+    let mut content_run_stats: Vec<stats::RunStats> = Vec::new();
 
     summarize_runs(runs.iter());
 
     for run in runs {
+        let mut run_stats = stats::RunStats::new();
         next_directories = Vec::new();
         let dir_iter = directories.into_iter();
         for direntry in dir_iter {
@@ -155,6 +186,7 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
             let mut filtered = true;
             let mut score = 0.0;
             for (scorer, target) in run.scorers.iter().zip(run.targets.iter()) {
+                run_stats.add_operation(scorer.get_name());
                 let ind_score = scorer.score(&content, &target);
                 if content.len() < 40{
                 }
@@ -165,20 +197,24 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
                     break;
                 }
             }
-
+            run_stats.add_length(content.len());
             if filtered {
                 next_directories.push((score, direntry));
             }
         }
-
         next_directories.sort_by(|a,b| a.0.partial_cmp(&b.0).unwrap());
         next_directories.reverse();
         directories = next_directories.into_iter().map(|x| x.1).collect();
+        content_run_stats.push(run_stats);
     }
 
     println!("RESULTS");
     for direntry in directories {
         println!("{:?}", direntry.path());
+    }
+
+    if args.contains(&String::from("--stats")) {
+        println!("{:?}", content_run_stats);
     }
 
     //results.sort_by(|a, b| a.partial_cmp(b).unwrap());

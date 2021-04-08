@@ -75,6 +75,11 @@ fn main() {
              .multiple(true)
              .takes_value(false)
              .about("Use file path"))
+
+        .arg(Arg::new("stats")
+             .long("stats")
+             .takes_value(false)
+             .about("Display statistics"))
         //.arg(Arg::new("content-exec")
         //     .long("content-exec")
         //     .about("Use file exec"))
