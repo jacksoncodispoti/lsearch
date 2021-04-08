@@ -9,6 +9,11 @@ fn main() {
         .version("0.0.1")
         .author("Alerik <alerik@alerik.de>")
         .about("Search through ALL files")
+        .arg(Arg::new("path")
+             .short('p')
+             .long("path")
+             .takes_value(true)
+             .value_name("PATH"))
 
         //Filters
         .arg(Arg::new("is")
@@ -68,6 +73,11 @@ fn main() {
         .get_matches();
 
     let result: Vec<String> = env::args().collect();
+    let path = matches.value_of("path");
+    let path =  match path{
+        Some(path) => {path},
+        None => {"./"}
+    };
 
-    cli::process_command(result);
+    cli::process_command(path, result);
 }
