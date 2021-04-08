@@ -30,7 +30,7 @@ There are several types of content. Listed are some below:
 |--content-path|/home/jackson/testfile.txt|
 |--content-title|testfile|
 |--content-ext|txt|
-|--content-text|Hello there|
+|--content-text|Hello there!|
 |--context-exif|[planned]|
 |--content-exec|[planned]|
 
