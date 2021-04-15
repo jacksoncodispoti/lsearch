@@ -204,9 +204,6 @@ fn get_output_specs(args: std::slice::Iter<String>) -> OutputSpecs {
 
 pub fn process_command(path: &str, args: Vec<String>) -> u32 {
     let mut path = path::PathBuf::from(path);
-    println!("\tls {:?}", path);
-    path = fs::canonicalize(&path).unwrap();
-    println!("\tls {:?}", path);
     //let command_order = process_command_order(args);
     let mut runs = get_content_runs(args.iter());
 
@@ -223,6 +220,11 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
     let mut next_directories: Vec<(f32, walkdir::DirEntry)> = Vec::new();
     let mut content_run_stats: Vec<stats::RunStats> = Vec::new();
 
+    path = fs::canonicalize(&path).unwrap();
+    if args.contains(&String::from("--echo")) {
+        println!("\tls {:?}", path);
+        println!("\tls {:?}", path);
+    }
 
     if args.contains(&String::from("--strats")) {
         summarize_runs(runs.iter());

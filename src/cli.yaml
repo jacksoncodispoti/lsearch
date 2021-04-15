@@ -111,3 +111,8 @@ args:
                 multiple: false
                 takes_value: false
                 about: Print absolute path
+        - echo:
+                long: echo
+                multiple: false
+                takes_value: false
+                about: Echo command
