@@ -102,17 +102,16 @@ fn get_content_runs(args: std::slice::Iter<String>) -> Vec<ContentRun> {
                 continue;
             }
 
-            scorer = match arg.as_str() {
+            match arg.as_str() {
                 //Filter/Scorer
-                "--is" => Box::new(search::scorers::Is{}),
-                "--not" => Box::new(search::scorers::Not{}),
-                "--has" => Box::new(search::scorers::Has{}),
-                "--hasnt" => Box::new(search::scorers::Hasnt{}),
-                "--more" => Box::new(search::scorers::More{}),
-                _ => Box::new(search::scorers::Pass{})
+                "--is" => { current_run.scorers.push(Box::new(search::scorers::Is{}))},
+                "--not" =>{ current_run.scorers.push(Box::new(search::scorers::Not{}))},
+                "--has" =>{ current_run.scorers.push(Box::new(search::scorers::Has{}))},
+                "--hasnt" =>{ current_run.scorers.push(Box::new(search::scorers::Hasnt{}))},
+                "--more" =>{ current_run.scorers.push(Box::new(search::scorers::More{}))},
+                _ =>{ }
             };
 
-            current_run.scorers.push(scorer);
             continue;
         }
 
@@ -173,6 +172,7 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
             for (scorer, target) in run.scorers.iter().zip(run.targets.iter()) {
                 run_stats.add_operation(scorer.get_name());
                 let ind_score = scorer.score(&content, &target);
+                //println!("\t{:?}", scorer);
                 if content.len() < 40{
                 }
                 score += ind_score; 

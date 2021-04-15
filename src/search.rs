@@ -75,14 +75,15 @@ pub mod loaders {
 }
 
 pub mod scorers {
-    pub trait ContentScorer {
+    pub trait ContentScorer: std::fmt::Debug {
         fn score(&self, content: &String, target: &String) -> f32;
         fn get_name(&self) -> String;
     }
-    pub trait ContentFilter {
+    pub trait ContentFilter: std::fmt::Debug {
         fn filter(&self, content: &String, target: &String) -> bool;
     }
 
+    #[derive(Debug)]
     pub struct Is {
     }
     impl ContentFilter for Is {
@@ -99,6 +100,7 @@ pub mod scorers {
         }
     }
 
+    #[derive(Debug)]
     pub struct Not {
     }
     impl ContentFilter for Not {
@@ -115,6 +117,7 @@ pub mod scorers {
         }
     }
 
+    #[derive(Debug)]
     pub struct Has {
     }
     impl ContentFilter for Has {
@@ -134,6 +137,7 @@ pub mod scorers {
         }
     }
 
+    #[derive(Debug)]
     pub struct Hasnt {
     }
     impl ContentFilter for Hasnt {
@@ -153,6 +157,7 @@ pub mod scorers {
         }
     }
 
+    #[derive(Debug)]
     pub struct More {
     }
     impl ContentScorer for More {
@@ -170,6 +175,7 @@ pub mod scorers {
         }
     }
 
+    #[derive(Debug)]
     pub struct Pass {
 
     }
