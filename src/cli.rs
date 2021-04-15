@@ -158,9 +158,19 @@ struct FileTraverseSpecs {
     hidden: bool
 }
 
+struct OutputSpecs {
+    absolute: bool
+}
+
 impl FileTraverseSpecs {
     fn new(recursive: bool, hidden:bool) -> FileTraverseSpecs {
         FileTraverseSpecs{recursive: recursive,  hidden: hidden}
+    }
+}
+
+impl OutputSpecs {
+    fn new(absolute: bool) -> OutputSpecs {
+        OutputSpecs{ absolute: absolute }
     }
 }
 
@@ -179,6 +189,19 @@ fn get_file_traverse_specs(args: std::slice::Iter<String>) -> FileTraverseSpecs 
     return FileTraverseSpecs::new(recursive, hidden);
 }
 
+fn get_output_specs(args: std::slice::Iter<String>) -> OutputSpecs {
+    let mut absolute = false;
+
+    for arg in args {
+        match arg.as_str() {
+            "--absolute" => { absolute = true; },
+            _ => {}
+        }
+    }
+
+    return OutputSpecs::new(absolute);
+}
+
 pub fn process_command(path: &str, args: Vec<String>) -> u32 {
     let mut path = path::PathBuf::from(path);
     println!("\tls {:?}", path);
@@ -191,6 +214,7 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
         runs.push(ContentRun::default());
     }
     let traverse_specs = get_file_traverse_specs(args.iter());
+    let output_specs = get_output_specs(args.iter());
     let loader_names: Vec<String> = runs.iter().map(|r| String::from(&r.content_loader)).collect();
     let content_loaders = get_content_loaders(loader_names.iter());
     //
@@ -246,13 +270,17 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
         //directories = next_directories.into_iter().collect();
         content_run_stats.push(run_stats);
     }
+    
+    let working_dir = std::env::current_dir().unwrap();
 
     for (score, direntry) in next_directories {
+        let mut dir_path = direntry.path().as_os_str().to_str().unwrap();
+        let clean_path = dir_path.strip_prefix(working_dir.as_path().as_os_str().to_str().unwrap());
         if args.contains(&String::from("--score")) {
-            println!("[{}] {}", score, direntry.path().as_os_str().to_str().unwrap());
+            println!("[{}] {}", score, match clean_path { Some(str) => str, None => { "" } });
         }
         else{
-            println!("{}", direntry.path().as_os_str().to_str().unwrap());
+            println!("{}", match clean_path { Some(str) => str, None => { "" } });
         }
     }
 

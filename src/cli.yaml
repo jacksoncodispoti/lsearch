@@ -104,3 +104,10 @@ args:
                 multiple: false
                 takes_value: false
                 about: Recursivelly descend
+
+        #Output formatting
+        - absolute:
+                long: absolute
+                multiple: false
+                takes_value: false
+                about: Print absolute path
