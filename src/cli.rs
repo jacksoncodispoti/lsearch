@@ -165,12 +165,17 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
         let dir_iter = directories.into_iter();
         for direntry in dir_iter {
             let content_loader = content_loaders.get(&run.content_loader).expect("Unable to get content loader");
-            let content = content_loader.load_content(&direntry);
+            let mut content = content_loader.load_content(&direntry);
+           
+            if args.contains(&String::from("--insensitive")) {
+                content = content.to_ascii_lowercase();
+            }
 
             let mut filtered = true;
             let mut score = 0.0;
             for (scorer, target) in run.scorers.iter().zip(run.targets.iter()) {
                 run_stats.add_operation(scorer.get_name());
+                let target = target.to_ascii_lowercase();
                 let ind_score = scorer.score(&content, &target);
                 //println!("\t{:?}", scorer);
                 if content.len() < 40{
