@@ -97,4 +97,10 @@ args:
                 multiple: true
                 takes_value: false
                 about: File path
-
+        #File & Directory operation
+        - recursive:
+                short: r
+                long: recursive
+                multiple: false
+                takes_value: false
+                about: Recursivelly descend

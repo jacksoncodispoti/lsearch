@@ -66,6 +66,10 @@ struct ContentRun {
 }
 
 impl ContentRun {
+    fn default() -> ContentRun {
+        ContentRun { content_loader: String::from("--content-title"), scorers: vec![Box::new(search::scorers::Pass{})], targets: vec![String::from("")], insensitive: true }
+    }
+
     fn is_valid(&self) -> bool {
         let mut legit = false;
 
@@ -181,8 +185,12 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
     path = fs::canonicalize(&path).unwrap();
     println!("\tls {:?}", path);
     //let command_order = process_command_order(args);
-    let runs = get_content_runs(args.iter());
-    let traverseSpecs = get_file_traverse_specs(args.iter());
+    let mut runs = get_content_runs(args.iter());
+
+    if runs.len() == 0 {
+        runs.push(ContentRun::default());
+    }
+    let traverse_specs = get_file_traverse_specs(args.iter());
     let loader_names: Vec<String> = runs.iter().map(|r| String::from(&r.content_loader)).collect();
     let content_loaders = get_content_loaders(loader_names.iter());
     //
@@ -198,7 +206,10 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
 
     for run in runs {
         let mut run_stats = stats::RunStats::new();
-        let directories = WalkDir::new(&path);
+        let directories = match traverse_specs.recursive {
+            true => WalkDir::new(&path),
+            false => WalkDir::new(&path).max_depth(1)
+        };
 
         for direntry in directories {
             let direntry = direntry.unwrap();
