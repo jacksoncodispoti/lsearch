@@ -275,12 +275,27 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
 
     for (score, direntry) in next_directories {
         let mut dir_path = direntry.path().as_os_str().to_str().unwrap();
-        let clean_path = dir_path.strip_prefix(working_dir.as_path().as_os_str().to_str().unwrap());
-        if args.contains(&String::from("--score")) {
-            println!("[{}] {}", score, match clean_path { Some(str) => str, None => { "" } });
+        
+        if output_specs.absolute{
+            if args.contains(&String::from("--score")) {
+                println!("[{}] {}", score, dir_path);
+            }
+            else{
+                println!("{}", dir_path);
+            }
         }
         else{
-            println!("{}", match clean_path { Some(str) => str, None => { "" } });
+            let clean_path = match dir_path.strip_prefix(working_dir.as_path().as_os_str().to_str().unwrap()) {
+                Some(str) => if str.len() > 0 { &str[1..] } else { "" },
+                None => ""
+            };
+
+            if args.contains(&String::from("--score")) {
+                println!("[{}] {}", score, clean_path);
+            }
+            else{
+                println!("{}", clean_path);
+            }
         }
     }
 
