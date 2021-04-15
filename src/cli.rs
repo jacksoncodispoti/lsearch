@@ -43,12 +43,12 @@ fn get_content_loaders(loaders: std::slice::Iter<String>) -> HashMap<String, Box
         //Path based
         if !content_loaders.contains_key(&String::from(loader)) {
             content_loaders.insert(String::from(loader), 
-                    match loader.as_str() {
-                        "--content-path" => Box::new(search::loaders::PathLoader::new()),
-                        "--content-title" => Box::new(search::loaders::TitleLoader::new()),
-                        "--content-ext" => Box::new(search::loaders::ExtLoader::new()),
-                        _ =>  Box::new(search::loaders::TextLoader::new())
-            });
+                                   match loader.as_str() {
+                                       "--content-path" => { Box::new(search::loaders::PathLoader::new()) },
+                                       "--content-title" => {Box::new(search::loaders::TitleLoader::new())},
+                                       "--content-ext" => {Box::new(search::loaders::ExtLoader::new())},
+                                       _ =>  {Box::new(search::loaders::TextLoader::new())}
+                                   });
         }
     }
 
@@ -58,7 +58,8 @@ fn get_content_loaders(loaders: std::slice::Iter<String>) -> HashMap<String, Box
 struct ContentRun {
     content_loader: String,
     scorers: Vec<Box<dyn search::scorers::ContentScorer>>,
-    targets: Vec<String>
+    targets: Vec<String>,
+    insensitive: bool
 }
 
 impl ContentRun {
@@ -78,14 +79,18 @@ impl ContentRun {
 
 fn get_content_runs(args: std::slice::Iter<String>) -> Vec<ContentRun> {
     let mut current_loader = "--content-text";
-    let mut current_run: ContentRun = ContentRun{content_loader: String::from(current_loader), scorers: Vec::new(), targets: Vec::new()};
+    let mut current_run: ContentRun = ContentRun{content_loader: String::from(current_loader), scorers: Vec::new(), targets: Vec::new(), insensitive: true};
     let mut content_runs: Vec<ContentRun> = Vec::new();
 
     let mut scorer: Box<dyn search::scorers::ContentScorer> = Box::new(search::scorers::Pass{});
 
+    let mut insensitive = false;
     for arg in args {
         if arg.starts_with("--") {
             //Content loading
+            if arg.starts_with("--insensitive") {
+                insensitive = true;
+            }
             if arg.starts_with("--content") {
                 current_loader = arg;
 
@@ -93,7 +98,7 @@ fn get_content_runs(args: std::slice::Iter<String>) -> Vec<ContentRun> {
                     content_runs.push(current_run);
                 }
 
-                current_run = ContentRun{content_loader: String::from(current_loader), scorers: Vec::new(), targets: Vec::new()};
+                current_run = ContentRun{content_loader: String::from(current_loader), scorers: Vec::new(), targets: Vec::new(), insensitive: insensitive};
                 continue;
             }
 
@@ -140,11 +145,8 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
     let runs = get_content_runs(args.iter());
     let loader_names: Vec<String> = runs.iter().map(|r| String::from(&r.content_loader)).collect();
     let content_loaders = get_content_loaders(loader_names.iter());
+    //
     //optimize_content_run_order(&mut runs);
-    let mut directories: Vec<walkdir::DirEntry> = WalkDir::new(path)
-        .into_iter()
-        .map(|x| x.unwrap())
-        .collect();
 
     let mut next_directories: Vec<(f32, walkdir::DirEntry)> = Vec::new();
     let mut content_run_stats: Vec<stats::RunStats> = Vec::new();
@@ -155,6 +157,10 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
     }
 
     for run in runs {
+        let mut directories: Vec<walkdir::DirEntry> = WalkDir::new(path)
+            .into_iter()
+            .map(|x| x.unwrap())
+            .collect();
         let mut run_stats = stats::RunStats::new();
         next_directories = Vec::new();
         let dir_iter = directories.into_iter();
@@ -183,12 +189,17 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
         }
         next_directories.sort_by(|a,b| a.0.partial_cmp(&b.0).unwrap());
         next_directories.reverse();
-        directories = next_directories.into_iter().map(|x| x.1).collect();
+        //directories = next_directories.into_iter().collect();
         content_run_stats.push(run_stats);
     }
 
-    for direntry in directories {
-        println!("{}", direntry.path().as_os_str().to_str().unwrap());
+    for (score, direntry) in next_directories {
+        if args.contains(&String::from("--score")) {
+            println!("[{}] {}", score, direntry.path().as_os_str().to_str().unwrap());
+        }
+        else{
+            println!("{}", direntry.path().as_os_str().to_str().unwrap());
+        }
     }
 
     if args.contains(&String::from("--stats")) {

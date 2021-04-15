@@ -18,7 +18,7 @@ fn main() {
 
         //Filters
         .arg(Arg::new("is")
-             .short('i')
+             .short('e')
              .long("is")
              .multiple(true)
              .about("Filter to match on value")
@@ -76,7 +76,16 @@ fn main() {
              .multiple(true)
              .takes_value(false)
              .about("Use file path"))
+        .arg(Arg::new("insensitive")
+             .short('i')
+             .long("insensitive")
+             .takes_value(false)
+             .about("Don't match case"))
 
+        .arg(Arg::new("score")
+             .long("score")
+             .takes_value(false)
+             .about("Display score"))
         .arg(Arg::new("stats")
              .long("stats")
              .takes_value(false)
