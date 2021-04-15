@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use crate::search;
 use walkdir::WalkDir;
+use std::path;
 
 mod stats {
     use std::collections::HashMap;
@@ -35,6 +36,8 @@ mod stats {
         }
     }
 }
+
+use std::fs;
 
 fn get_content_loaders(loaders: std::slice::Iter<String>) -> HashMap<String, Box<dyn search::loaders::ContentLoader>> {
     let mut content_loaders: HashMap<String, Box<dyn search::loaders::ContentLoader>> = HashMap::new();
@@ -130,18 +133,56 @@ fn get_content_runs(args: std::slice::Iter<String>) -> Vec<ContentRun> {
 //}
 //
 fn summarize_runs(runs: std::slice::Iter<ContentRun>) {
+    println!("Summarizing Operational Runs:");
+    let mut count: u32 = 0;
     for run in runs {
         println!("Content: {}", run.content_loader);
 
         for (scorer, target) in run.scorers.iter().zip(run.targets.iter()) {
             println!("\t{}({})", scorer.get_name(), target);
         }
+        count += 1;
+    }
+
+    if count == 0 {
+        println!("\tNo operational runs");
     }
 }
 
+struct FileTraverseSpecs {
+    recursive: bool,
+    hidden: bool
+}
+
+impl FileTraverseSpecs {
+    fn new(recursive: bool, hidden:bool) -> FileTraverseSpecs {
+        FileTraverseSpecs{recursive: recursive,  hidden: hidden}
+    }
+}
+
+fn get_file_traverse_specs(args: std::slice::Iter<String>) -> FileTraverseSpecs {
+    let mut recursive = false;
+    let mut hidden = false;
+
+    for arg in args {
+        match arg.as_str() {
+            "--recursive" => { recursive = true; },
+            "--hidden" => { hidden = true; },
+            _ => {}
+        }
+    }
+
+    return FileTraverseSpecs::new(recursive, hidden);
+}
+
 pub fn process_command(path: &str, args: Vec<String>) -> u32 {
+    let mut path = path::PathBuf::from(path);
+    println!("\tls {:?}", path);
+    path = fs::canonicalize(&path).unwrap();
+    println!("\tls {:?}", path);
     //let command_order = process_command_order(args);
     let runs = get_content_runs(args.iter());
+    let traverseSpecs = get_file_traverse_specs(args.iter());
     let loader_names: Vec<String> = runs.iter().map(|r| String::from(&r.content_loader)).collect();
     let content_loaders = get_content_loaders(loader_names.iter());
     //
@@ -156,14 +197,11 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
     }
 
     for run in runs {
-        let mut directories: Vec<walkdir::DirEntry> = WalkDir::new(path)
-            .into_iter()
-            .map(|x| x.unwrap())
-            .collect();
         let mut run_stats = stats::RunStats::new();
-        next_directories = Vec::new();
-        let dir_iter = directories.into_iter();
-        for direntry in dir_iter {
+        let directories = WalkDir::new(&path);
+
+        for direntry in directories {
+            let direntry = direntry.unwrap();
             let content_loader = content_loaders.get(&run.content_loader).expect("Unable to get content loader");
             let mut content = content_loader.load_content(&direntry);
            
