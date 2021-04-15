@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use crate::search;
 use walkdir::WalkDir;
+use search::scorers::fs::{DirEntryFilter, HiddenFilter};
 use std::path;
 
 mod stats {
@@ -230,6 +231,8 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
         summarize_runs(runs.iter());
     }
 
+    let hidden_filter = HiddenFilter::new(args.contains(&String::from("--hidden")));
+
     for run in runs {
         let mut run_stats = stats::RunStats::new();
         let directories = match traverse_specs.recursive {
@@ -237,8 +240,10 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
             false => WalkDir::new(&path).max_depth(1)
         };
 
-        for direntry in directories {
-            let direntry = direntry.unwrap();
+        for direntry in directories.into_iter().filter_map(|e| e.ok()) {
+            if !hidden_filter.filter(&direntry) {
+                continue
+            }
             let content_loader = content_loaders.get(&run.content_loader).expect("Unable to get content loader");
             let mut content = content_loader.load_content(&direntry);
            

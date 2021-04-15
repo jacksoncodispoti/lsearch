@@ -75,6 +75,32 @@ pub mod loaders {
 }
 
 pub mod scorers {
+    pub mod fs {
+        pub trait DirEntryFilter: std::fmt::Debug {
+            fn filter(&self, content: &walkdir::DirEntry) -> bool;
+        }
+
+        #[derive(Debug)]
+        pub struct HiddenFilter {
+            allow: bool
+        }
+        impl DirEntryFilter for HiddenFilter {
+            fn filter(&self, content: &walkdir::DirEntry) -> bool {
+                if self.allow {
+                    true
+                }
+                else {
+                    !content.file_name().to_str().unwrap().starts_with(".")
+                }
+            }
+        }
+        impl HiddenFilter {
+            pub fn new(allow: bool) -> HiddenFilter {
+                HiddenFilter{allow: allow}
+            }
+        }
+    }
+
     pub trait ContentScorer: std::fmt::Debug {
         fn score(&self, content: &String, target: &String) -> f32;
         fn get_name(&self) -> String;

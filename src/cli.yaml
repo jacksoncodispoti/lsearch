@@ -104,6 +104,11 @@ args:
                 multiple: false
                 takes_value: false
                 about: Recursivelly descend
+        - hidden:
+                long: hidden
+                multiple: false
+                takes_value: false
+                about: Display hidden files and directories
 
         #Output formatting
         - absolute:
