@@ -11,6 +11,15 @@ To build, simply run:
 cargo build
 ```
 
+# Installing
+To install lsearch, run:
+```
+cargo install --path /usr/bin
+```
+And to fully integrate lsearch into your workflow, you can then run:
+```
+echo "alias ls=lsearch" >> .bashrc
+```
 # Usage
 In lsearch, commands are simple: you tell it what content to use and what to look for:
 ```
