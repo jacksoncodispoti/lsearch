@@ -1,0 +1,100 @@
+name: L-Search
+version: "0.0.2"
+author: Jackson C <jacksonc@alerik.de>
+about: Search through ALL files
+args: 
+        - path:
+                short: p
+                long: path
+                takes_value: true
+                value_name: PATH
+                about: The path to look in
+        #Filters
+        - is:
+                short: e
+                long: is
+                multiple: true
+                takes_value: true
+                about: Filter where value is equal to
+        - not:
+                short: n
+                long: not 
+                multiple: true
+                takes_value: true
+                about: Filter where value is not equal to
+        - has:
+                short: h
+                long: has
+                multiple: true
+                takes_value: true
+                about: Filter where value contains 
+        - hasnt:
+                short: H
+                long: hasnt
+                multiple: true
+                takes_value: true
+                about: Filter where value doesn't contain 
+        
+        #Scorers
+        - more:
+                short: m
+                long: more
+                multiple: true
+                takes_value: true
+                about: Increase based on matches
+        - less:
+                short: l
+                long: less
+                multiple: true
+                takes_value: true
+                about: Decrease based on matches
+
+        #Specifiers
+        - insensitive:
+                short: i
+                long: insensitive
+                multiple: true
+                takes_value: false
+                about: Don't match case
+
+        #Output
+        - score:
+                long: score
+                takes_value: false
+                about: Display score
+        - stats:
+                long: stats
+                takes_value: false
+                about: Display statistics
+        - strats:
+                long: strats
+                takes_value: false
+                about: Display decision strategy
+
+
+        #Content types
+        - content-text:
+                short: t
+                long: content-text
+                multiple: true
+                takes_value: false
+                about: File contents
+        - content-ext:
+                short: E
+                long: content-ext
+                multiple: true
+                takes_value: false
+                about: File extension
+        - content-title:
+                short: T
+                long: content-title
+                multiple: true
+                takes_value: false
+                about: File title
+        - content-path:
+                short: P
+                long: content-path
+                multiple: true
+                takes_value: false
+                about: File path
+
