@@ -240,7 +240,7 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
             false => WalkDir::new(&path).max_depth(1)
         };
 
-        for direntry in directories.into_iter().filter_map(|e| e.ok()) {
+        for direntry in directories.sort_by(|a,b| b.file_name().cmp(a.file_name())).into_iter().filter_map(|e| e.ok()) {
             if !hidden_filter.filter(&direntry) {
                 continue
             }
