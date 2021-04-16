@@ -3,42 +3,143 @@ use crate::search;
 use walkdir::WalkDir;
 use search::scorers::fs::{DirEntryFilter, HiddenFilter};
 use std::path;
+use std::fs;
+
 
 mod stats {
     use std::collections::HashMap;
+    use std::time::Instant;
+    use std::fmt;
+
+    #[derive(Debug)]
+    pub struct OperationStats {
+        name: String,
+        n: usize,
+        avg_time: f32,
+        avg_size: f32,
+        instant: Instant
+    }
+
+    impl fmt::Display for OperationStats {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            writeln!(f, "\t\t{} [n={}, avg_t={:.1}ns, avg_s={:.1}]", self.name, self.n, self.avg_time, self.avg_size)
+        }
+    }
+
+    impl OperationStats {
+        fn new(name: &String) -> OperationStats {
+            OperationStats { name: String::from(name), n: 0, avg_time: 0.0, avg_size: 0.0, instant: Instant::now() }
+        }
+
+        fn start(&mut self, content_len: usize) {
+            self.avg_size = (self.n as f32 * self.avg_size + content_len as f32) / (self.n as f32 + 1.0);
+            self.instant = Instant::now();
+        }
+
+        fn stop(&mut self) {
+            let elapsed = self.instant.elapsed().as_nanos() as f32 / 1000.0;
+            self.avg_time = (self.n as f32 * self.avg_time + elapsed) / (self.n as f32 + 1.0);
+            self.n += 1;
+        }
+    }
+
     #[derive(Debug)]
     pub struct RunStats {
-        operations: HashMap<String, u32>,
+        operations: HashMap<String, OperationStats>,
+        operation_order: Vec<String>,
+        content_loader: String,
         avg_length: f32,
-        n: usize
+        n: usize,
+        time: u128,
+        instant: Instant
+    }
+
+    impl fmt::Display for RunStats {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            writeln!(f, "\t{} [n={}, t={}μs]", self.content_loader, self.n, self.time as f32 / 1000.0).unwrap();
+            for op in &self.operation_order {
+                match self.operations.get(op) {
+                    Some(operation) => { write!(f, "{}", operation).unwrap(); },
+                    None => { writeln!(f, "{} (Never executed)", op).unwrap(); }
+                }
+            }
+            Ok(())
+        }
     }
 
     impl RunStats {
-        pub fn add_operation(&mut self, operation: String) {
-            if self.operations.contains_key(&operation) {
-                let next = self.operations.get(&operation).unwrap() + 1;
-                self.operations.insert(operation, next);
-            }
-            else{
-                self.operations.insert(operation, 1);
-            }
-        }
         pub fn add_length(&mut self, length: usize) {
             self.avg_length = (self.n as f32 * self.avg_length as f32 + length as f32) / (self.n as f32 + 1.0);
             self.n += 1;
         }
+        pub fn start_timer(&mut self) {
+            self.instant = Instant::now();
+        }
+        pub fn stop_timer(&mut self) {
+            let elapsed = self.instant.elapsed();
+            self.time += elapsed.as_nanos();
+        }
+        pub fn start_operation(&mut self, operation: &String, content_len: usize) {
+            if self.operations.contains_key(operation) {
+                self.operations.get_mut(operation).expect("this should not happen").start(content_len);
+            }
+            else {
+                self.operations.insert(String::from(operation), OperationStats::new(&operation));
+            }
+        }
+        pub fn stop_operation(&mut self, operation: &String) {
+            if self.operations.contains_key(operation) {
+                self.operations.get_mut(operation).expect("This should not happen").stop();
+            }
+        }
 
-        pub fn new() -> RunStats {
+        pub fn new(run: &crate::cli::ContentRun) -> RunStats {
+            let operation_order: Vec<String> = run.scorers.iter().map(|s| s.get_name()).collect();
+
             RunStats {
                 operations: HashMap::new(), 
+                operation_order: operation_order,
+                content_loader: String::from(&run.content_loader),
                 avg_length: 0.0, 
-                n: 0
+                n: 0,
+                time: 0,
+                instant: Instant::now()
             }
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct AppStats {
+        runs: Vec<RunStats> 
+    }
+
+    impl fmt::Display for AppStats {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            writeln!(f, "Operational Statistics").unwrap();
+            for run_stats in &self.runs {
+                writeln!(f, "{}", run_stats).unwrap();
+            }
+            Ok(())
+        }
+    }
+
+    impl AppStats {
+        pub fn new() -> AppStats {
+            AppStats { runs: vec![] }
+        }
+
+        pub fn push_run(&mut self, run_stats: RunStats) {
+            self.runs.push(run_stats); 
         }
     }
 }
 
-use std::fs;
+pub struct ContentRun {
+    content_loader: String,
+    scorers: Vec<Box<dyn search::scorers::ContentScorer>>,
+    targets: Vec<String>,
+    insensitive: bool
+}
 
 fn get_content_loaders(loaders: std::slice::Iter<String>) -> HashMap<String, Box<dyn search::loaders::ContentLoader>> {
     let mut content_loaders: HashMap<String, Box<dyn search::loaders::ContentLoader>> = HashMap::new();
@@ -59,12 +160,6 @@ fn get_content_loaders(loaders: std::slice::Iter<String>) -> HashMap<String, Box
     content_loaders
 }
 
-struct ContentRun {
-    content_loader: String,
-    scorers: Vec<Box<dyn search::scorers::ContentScorer>>,
-    targets: Vec<String>,
-    insensitive: bool
-}
 
 impl ContentRun {
     fn default() -> ContentRun {
@@ -201,6 +296,17 @@ fn get_output_specs(args: std::slice::Iter<String>) -> OutputSpecs {
     return OutputSpecs::new(absolute);
 }
 
+fn get_content(run: &ContentRun, content_loaders: &HashMap<String, Box<dyn search::loaders::ContentLoader>>, direntry: &walkdir::DirEntry) -> String {
+    let content_loader = content_loaders.get(&run.content_loader).expect("Unable to get content loader");
+    let mut content = content_loader.load_content(&direntry);
+   
+    if run.insensitive {
+        content = content.to_ascii_lowercase();
+    }
+
+    content
+}
+
 pub fn process_command(path: &str, args: Vec<String>) -> u32 {
     let mut path = path::PathBuf::from(path);
     //let command_order = process_command_order(args);
@@ -217,7 +323,8 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
     //optimize_content_run_order(&mut runs);
 
     let mut next_directories: Vec<(f32, walkdir::DirEntry)> = Vec::new();
-    let mut content_run_stats: Vec<stats::RunStats> = Vec::new();
+    let mut app_stats = stats::AppStats::new();
+    //let mut content_run_stats: Vec<stats::RunStats> = Vec::new();
 
     path = fs::canonicalize(&path).unwrap();
     if args.contains(&String::from("--echo")) {
@@ -232,7 +339,7 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
     let hidden_filter = HiddenFilter::new(traverse_specs.hidden);
 
     for run in runs {
-        let mut run_stats = stats::RunStats::new();
+        let mut run_stats = stats::RunStats::new(&run);
         let directories = match traverse_specs.recursive {
             true => WalkDir::new(&path),
             false => WalkDir::new(&path).max_depth(1)
@@ -242,20 +349,18 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
             if !hidden_filter.filter(&direntry) {
                 continue
             }
-            let content_loader = content_loaders.get(&run.content_loader).expect("Unable to get content loader");
-            let mut content = content_loader.load_content(&direntry);
-           
-            if run.insensitive {
-                content = content.to_ascii_lowercase();
-            }
 
+            let content = get_content(&run, &content_loaders, &direntry);
             let mut filtered = true;
             let mut score = 0.0;
+
             for (scorer, target) in run.scorers.iter().zip(run.targets.iter()) {
-                run_stats.add_operation(scorer.get_name());
                 let target = target.to_ascii_lowercase();
+
+                run_stats.start_operation(&scorer.get_name(), content.len());
                 let ind_score = scorer.score(&content, &target);
-                //println!("\t{:?}", scorer);
+                run_stats.stop_operation(&scorer.get_name());
+
                 if content.len() < 40{
                 }
                 score += ind_score; 
@@ -265,15 +370,18 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
                     break;
                 }
             }
+
             run_stats.add_length(content.len());
+
             if filtered {
                 next_directories.push((score, direntry));
             }
         }
         next_directories.sort_by(|a,b| a.0.partial_cmp(&b.0).unwrap());
         next_directories.reverse();
+        run_stats.stop_timer();
         //directories = next_directories.into_iter().collect();
-        content_run_stats.push(run_stats);
+        app_stats.push_run(run_stats);
     }
     
     let working_dir = std::env::current_dir().unwrap();
@@ -305,7 +413,7 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
     }
 
     if args.contains(&String::from("--stats")) {
-        println!("{:?}", content_run_stats);
+        print!("{}", app_stats);
     }
     0
 }
