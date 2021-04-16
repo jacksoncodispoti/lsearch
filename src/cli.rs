@@ -189,8 +189,8 @@ fn get_content_runs(args: std::slice::Iter<String>) -> Vec<ContentRun> {
     for arg in args {
         if arg.starts_with("--") {
             //Content loading
-            if arg.starts_with("--insensitive") {
-                insensitive = true;
+            if arg == "--insensitive" {
+                current_run.insensitive = true;
             }
             if arg.starts_with("--content") {
                 current_loader = arg;
@@ -222,6 +222,10 @@ fn get_content_runs(args: std::slice::Iter<String>) -> Vec<ContentRun> {
         content_runs.push(current_run);
     }
 
+    if content_runs.len() == 0 {
+        content_runs.push(ContentRun::default());
+    }
+
     return content_runs;
 }
 
@@ -234,7 +238,7 @@ fn summarize_runs(runs: std::slice::Iter<ContentRun>) {
     println!("Summarizing Operational Runs:");
     let mut count: u32 = 0;
     for run in runs {
-        println!("Content: {}", run.content_loader);
+        println!("{} [insensitive={}]", run.content_loader, run.insensitive);
 
         for (scorer, target) in run.scorers.iter().zip(run.targets.iter()) {
             println!("\t{}({})", scorer.get_name(), target);
@@ -310,11 +314,8 @@ fn get_content(run: &ContentRun, content_loaders: &HashMap<String, Box<dyn searc
 pub fn process_command(path: &str, args: Vec<String>) -> u32 {
     let mut path = path::PathBuf::from(path);
     //let command_order = process_command_order(args);
-    let mut runs = get_content_runs(args.iter());
+    let runs = get_content_runs(args.iter());
 
-    if runs.len() == 0 {
-        runs.push(ContentRun::default());
-    }
     let traverse_specs = get_file_traverse_specs(args.iter());
     let output_specs = get_output_specs(args.iter());
     let loader_names: Vec<String> = runs.iter().map(|r| String::from(&r.content_loader)).collect();
