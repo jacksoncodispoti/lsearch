@@ -75,6 +75,13 @@ pub mod loaders {
 }
 
 pub mod scorers {
+    pub fn create_key_from_scorer(scorer: &Box<dyn ContentScorer>, target: &String) -> String {
+        create_key(&scorer.get_name(), target)
+    }
+    pub fn create_key(scorer: &String, target: &String) -> String {
+        String::from(scorer) + "(" + target + ")"
+    }
+
     pub mod fs {
         pub trait DirEntryFilter: std::fmt::Debug {
             fn filter(&self, content: &walkdir::DirEntry) -> bool;

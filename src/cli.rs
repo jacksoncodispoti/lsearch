@@ -47,6 +47,7 @@ mod stats {
     pub struct RunStats {
         operations: HashMap<String, OperationStats>,
         operation_order: Vec<String>,
+        targets: Vec<String>,
         content_loader: String,
         avg_length: f32,
         n: usize,
@@ -57,8 +58,9 @@ mod stats {
     impl fmt::Display for RunStats {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             writeln!(f, "\t{} [n={}, t={}μs]", self.content_loader, self.n, self.time as f32 / 1000.0).unwrap();
-            for op in &self.operation_order {
-                match self.operations.get(op) {
+            for (op, target) in self.operation_order.iter().zip(self.targets.iter()) {
+                let key = crate::search::scorers::create_key(&op, &target);
+                match self.operations.get(&key) {
                     Some(operation) => { write!(f, "{}", operation).unwrap(); },
                     None => { writeln!(f, "\t\t{} (Never executed)", op).unwrap(); }
                 }
@@ -95,10 +97,12 @@ mod stats {
 
         pub fn new(run: &crate::cli::ContentRun) -> RunStats {
             let operation_order: Vec<String> = run.scorers.iter().map(|s| s.get_name()).collect();
+            let targets: Vec<String> = run.targets.iter().map(|s| String::from(s)).collect();
 
             RunStats {
                 operations: HashMap::new(), 
                 operation_order: operation_order,
+                targets: targets,
                 content_loader: String::from(&run.content_loader),
                 avg_length: 0.0, 
                 n: 0,
@@ -363,14 +367,13 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
             let mut score = 0.0;
 
             for (scorer, target) in run.scorers.iter().zip(run.targets.iter()) {
+                let operation_key = search::scorers::create_key_from_scorer(&scorer, &target);
                 let target = if run.insensitive { target.to_ascii_lowercase() } else { String::from(target) };
 
-                run_stats.start_operation(&scorer.get_name(), content.len());
+                run_stats.start_operation(&operation_key, content.len());
                 let ind_score = scorer.score(&content, &target);
-                run_stats.stop_operation(&scorer.get_name());
+                run_stats.stop_operation(&operation_key);
 
-                if content.len() < 40{
-                }
                 score += ind_score; 
 
                 if ind_score < 1.0 {
@@ -378,8 +381,6 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
                     break;
                 }
             }
-
-            run_stats.add_length(content.len());
 
             if filtered {
                 next_directories.push((score, direntry));
