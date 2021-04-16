@@ -57,7 +57,7 @@ mod stats {
 
     impl fmt::Display for RunStats {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            writeln!(f, "\t{} [n={}, t={}μs]", self.content_loader, self.n, self.time as f32 / 1000.0).unwrap();
+            writeln!(f, "\t{} [t={}μs]", self.content_loader, self.time as f32 / 1000.0).unwrap();
             for (op, target) in self.operation_order.iter().zip(self.targets.iter()) {
                 let key = crate::search::scorers::create_key(&op, &target);
                 match self.operations.get(&key) {
@@ -189,7 +189,7 @@ fn get_content_runs(args: std::slice::Iter<String>) -> Vec<ContentRun> {
     let mut current_run: ContentRun = ContentRun{content_loader: String::from(current_loader), scorers: Vec::new(), targets: Vec::new(), insensitive: true};
     let mut content_runs: Vec<ContentRun> = Vec::new();
 
-    let mut insensitive = false;
+    let insensitive = false;
     for arg in args {
         if arg.starts_with("--") {
             //Content loading
