@@ -90,8 +90,6 @@ fn get_content_runs(args: std::slice::Iter<String>) -> Vec<ContentRun> {
     let mut current_run: ContentRun = ContentRun{content_loader: String::from(current_loader), scorers: Vec::new(), targets: Vec::new(), insensitive: true};
     let mut content_runs: Vec<ContentRun> = Vec::new();
 
-    let mut scorer: Box<dyn search::scorers::ContentScorer> = Box::new(search::scorers::Pass{});
-
     let mut insensitive = false;
     for arg in args {
         if arg.starts_with("--") {
@@ -231,7 +229,7 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
         summarize_runs(runs.iter());
     }
 
-    let hidden_filter = HiddenFilter::new(args.contains(&String::from("--hidden")));
+    let hidden_filter = HiddenFilter::new(traverse_specs.hidden);
 
     for run in runs {
         let mut run_stats = stats::RunStats::new();
@@ -247,7 +245,7 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
             let content_loader = content_loaders.get(&run.content_loader).expect("Unable to get content loader");
             let mut content = content_loader.load_content(&direntry);
            
-            if args.contains(&String::from("--insensitive")) {
+            if run.insensitive {
                 content = content.to_ascii_lowercase();
             }
 
@@ -281,7 +279,7 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
     let working_dir = std::env::current_dir().unwrap();
 
     for (score, direntry) in next_directories {
-        let mut dir_path = direntry.path().as_os_str().to_str().unwrap();
+        let dir_path = direntry.path().as_os_str().to_str().unwrap();
         
         if output_specs.absolute{
             if args.contains(&String::from("--score")) {

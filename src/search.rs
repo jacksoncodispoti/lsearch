@@ -67,7 +67,7 @@ pub mod loaders {
                 let mut contents = String::new();
                 let file = File::open(String::from(entry.path().to_str().unwrap())).unwrap();
                 let mut buf_reader = BufReader::new(file);
-                buf_reader.read_to_string(&mut contents);
+                buf_reader.read_to_string(&mut contents).expect("Failed to read contents");
                 contents
             }
         }
