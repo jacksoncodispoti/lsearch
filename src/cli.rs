@@ -362,7 +362,7 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
             let mut score = 0.0;
 
             for (scorer, target) in run.scorers.iter().zip(run.targets.iter()) {
-                let target = target.to_ascii_lowercase();
+                let target = if run.insensitive { target.to_ascii_lowercase() } else { String::from(target) };
 
                 run_stats.start_operation(&scorer.get_name(), content.len());
                 let ind_score = scorer.score(&content, &target);
