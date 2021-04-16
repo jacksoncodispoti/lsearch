@@ -60,7 +60,7 @@ mod stats {
             for op in &self.operation_order {
                 match self.operations.get(op) {
                     Some(operation) => { write!(f, "{}", operation).unwrap(); },
-                    None => { writeln!(f, "{} (Never executed)", op).unwrap(); }
+                    None => { writeln!(f, "\t\t{} (Never executed)", op).unwrap(); }
                 }
             }
             Ok(())
@@ -322,7 +322,6 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
     //
     //optimize_content_run_order(&mut runs);
 
-    let mut next_directories: Vec<(f32, walkdir::DirEntry)> = Vec::new();
     let mut app_stats = stats::AppStats::new();
     //let mut content_run_stats: Vec<stats::RunStats> = Vec::new();
 
@@ -338,14 +337,22 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
 
     let hidden_filter = HiddenFilter::new(traverse_specs.hidden);
 
+    let directories = match traverse_specs.recursive {
+        true => WalkDir::new(&path),
+        false => WalkDir::new(&path).max_depth(1)
+    }
+    .sort_by(|a,b| b.file_name().cmp(a.file_name()));
+    let mut directories: Vec<(f32, walkdir::DirEntry)> = directories.into_iter()
+        .filter_map(|e| e.ok())
+        .map(|a|(1.0, a))
+        .collect();
+    let mut next_directories: Vec<(f32, walkdir::DirEntry)>;
+
     for run in runs {
         let mut run_stats = stats::RunStats::new(&run);
-        let directories = match traverse_specs.recursive {
-            true => WalkDir::new(&path),
-            false => WalkDir::new(&path).max_depth(1)
-        };
+        next_directories = Vec::new();
 
-        for direntry in directories.sort_by(|a,b| b.file_name().cmp(a.file_name())).into_iter().filter_map(|e| e.ok()) {
+        for (_s, direntry) in directories.into_iter() {
             if !hidden_filter.filter(&direntry) {
                 continue
             }
@@ -377,16 +384,17 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
                 next_directories.push((score, direntry));
             }
         }
+
         next_directories.sort_by(|a,b| a.0.partial_cmp(&b.0).unwrap());
         next_directories.reverse();
         run_stats.stop_timer();
-        //directories = next_directories.into_iter().collect();
+        directories = next_directories;
         app_stats.push_run(run_stats);
     }
     
     let working_dir = std::env::current_dir().unwrap();
 
-    for (score, direntry) in next_directories {
+    for (score, direntry) in directories {
         let dir_path = direntry.path().as_os_str().to_str().unwrap();
         
         if output_specs.absolute{
