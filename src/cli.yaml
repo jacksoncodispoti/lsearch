@@ -4,8 +4,6 @@ author: Jackson C <jacksonc@alerik.de>
 about: Search through ALL files
 args: 
         - path:
-                short: p
-                long: path
                 takes_value: true
                 value_name: PATH
                 about: The path to look in
