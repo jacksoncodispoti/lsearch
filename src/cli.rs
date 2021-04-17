@@ -156,7 +156,7 @@ fn get_content_loaders(loaders: std::slice::Iter<String>) -> HashMap<String, Box
                                        "--content-path" => { Box::new(search::loaders::PathLoader::new()) },
                                        "--content-title" => {Box::new(search::loaders::TitleLoader::new())},
                                        "--content-ext" => {Box::new(search::loaders::ExtLoader::new())},
-                                       _ =>  {Box::new(search::loaders::TextLoader::new())}
+                                       _ =>  {Box::new(search::loaders::TitleLoader::new())}
                                    });
         }
     }
@@ -185,7 +185,7 @@ impl ContentRun {
 }
 
 fn get_content_runs(args: std::slice::Iter<String>) -> Vec<ContentRun> {
-    let mut current_loader = "--content-text";
+    let mut current_loader = "--content-title";
     let mut current_run: ContentRun = ContentRun{content_loader: String::from(current_loader), scorers: Vec::new(), targets: Vec::new(), insensitive: true};
     let mut content_runs: Vec<ContentRun> = Vec::new();
 
