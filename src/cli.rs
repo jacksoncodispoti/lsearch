@@ -190,7 +190,7 @@ fn get_content_runs(args: std::slice::Iter<String>) -> Vec<ContentRun> {
     let mut content_runs: Vec<ContentRun> = Vec::new();
 
     let insensitive = false;
-    for arg in args {
+    for arg in args.skip(1) {
         if arg.starts_with("--") {
             //Content loading
             if arg == "--insensitive" {
