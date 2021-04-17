@@ -15,5 +15,5 @@ fn main() {
         None => {"./"}
     };
 
-    cli::process_command(path, result);
+    cli::process_command(path, result, &matches);
 }

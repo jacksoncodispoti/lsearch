@@ -184,7 +184,7 @@ impl ContentRun {
     }
 }
 
-fn get_content_runs(args: std::slice::Iter<String>) -> Vec<ContentRun> {
+fn get_content_runs(args: std::slice::Iter<String>, matches: &clap::ArgMatches) -> Vec<ContentRun> {
     let mut current_loader = "--content-title";
     let mut current_run: ContentRun = ContentRun{content_loader: String::from(current_loader), scorers: Vec::new(), targets: Vec::new(), insensitive: true};
     let mut content_runs: Vec<ContentRun> = Vec::new();
@@ -291,15 +291,8 @@ fn get_file_traverse_specs(args: std::slice::Iter<String>) -> FileTraverseSpecs 
     return FileTraverseSpecs::new(recursive, hidden);
 }
 
-fn get_output_specs(args: std::slice::Iter<String>) -> OutputSpecs {
-    let mut absolute = false;
-
-    for arg in args {
-        match arg.as_str() {
-            "--absolute" => { absolute = true; },
-            _ => {}
-        }
-    }
+fn get_output_specs(args: std::slice::Iter<String>, matches: &clap::ArgMatches) -> OutputSpecs {
+    let absolute = matches.is_present("absolute");
 
     return OutputSpecs::new(absolute);
 }
@@ -315,13 +308,13 @@ fn get_content(run: &ContentRun, content_loaders: &HashMap<String, Box<dyn searc
     content
 }
 
-pub fn process_command(path: &str, args: Vec<String>) -> u32 {
+pub fn process_command(path: &str, args: Vec<String>, matches: &clap::ArgMatches) -> u32 {
     let mut path = path::PathBuf::from(path);
     //let command_order = process_command_order(args);
-    let runs = get_content_runs(args.iter());
+    let runs = get_content_runs(args.iter(), matches);
 
     let traverse_specs = get_file_traverse_specs(args.iter());
-    let output_specs = get_output_specs(args.iter());
+    let output_specs = get_output_specs(args.iter(), matches);
     let loader_names: Vec<String> = runs.iter().map(|r| String::from(&r.content_loader)).collect();
     let content_loaders = get_content_loaders(loader_names.iter());
     //
@@ -331,12 +324,12 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
     //let mut content_run_stats: Vec<stats::RunStats> = Vec::new();
 
     path = fs::canonicalize(&path).unwrap();
-    if args.contains(&String::from("--echo")) {
+    if matches.is_present("echo") {
         println!("\tls {:?}", path);
         println!("\tls {:?}", path);
     }
 
-    if args.contains(&String::from("--strats")) {
+    if matches.is_present("--strats") {
         summarize_runs(runs.iter());
     }
 
@@ -400,7 +393,7 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
         let dir_path = direntry.path().as_os_str().to_str().unwrap();
         
         if output_specs.absolute{
-            if args.contains(&String::from("--score")) {
+            if matches.is_present("score") {
                 println!("[{}] {}", score, dir_path);
             }
             else{
@@ -413,7 +406,7 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
                 None => ""
             };
 
-            if args.contains(&String::from("--score")) {
+            if matches.is_present("score") {
                 println!("[{}] {}", score, clean_path);
             }
             else{
@@ -422,7 +415,7 @@ pub fn process_command(path: &str, args: Vec<String>) -> u32 {
         }
     }
 
-    if args.contains(&String::from("--stats")) {
+    if matches.is_present("stats") {
         print!("{}", app_stats);
     }
     0
