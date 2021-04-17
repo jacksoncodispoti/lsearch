@@ -154,8 +154,10 @@ fn get_content_loaders(loaders: std::slice::Iter<String>) -> HashMap<String, Box
             content_loaders.insert(String::from(loader), 
                                    match loader.as_str() {
                                        "--content-path" => { Box::new(search::loaders::PathLoader::new()) },
+                                       "--content-path" => { Box::new(search::loaders::PathLoader::new()) },
                                        "--content-title" => {Box::new(search::loaders::TitleLoader::new())},
                                        "--content-ext" => {Box::new(search::loaders::ExtLoader::new())},
+                                       "-E" => {Box::new(search::loaders::ExtLoader::new())},
                                        _ =>  {Box::new(search::loaders::TitleLoader::new())}
                                    });
         }
@@ -168,6 +170,10 @@ fn get_content_loaders(loaders: std::slice::Iter<String>) -> HashMap<String, Box
 impl ContentRun {
     fn default() -> ContentRun {
         ContentRun { content_loader: String::from("--content-title"), scorers: vec![Box::new(search::scorers::Pass{})], targets: vec![String::from("")], insensitive: true }
+    }
+
+    fn new(content_loader: String, insensitive: bool) -> ContentRun {
+        ContentRun { content_loader: content_loader, scorers: vec![], targets: vec![], insensitive: insensitive }
     }
 
     fn is_valid(&self) -> bool {
@@ -184,6 +190,9 @@ impl ContentRun {
     }
 }
 
+fn is_is(s: &str) -> bool {
+    true
+}
 fn get_content_runs(args: std::slice::Iter<String>, matches: &clap::ArgMatches) -> Vec<ContentRun> {
     let mut current_loader = "--content-title";
     let mut current_run: ContentRun = ContentRun{content_loader: String::from(current_loader), scorers: Vec::new(), targets: Vec::new(), insensitive: true};
@@ -191,7 +200,7 @@ fn get_content_runs(args: std::slice::Iter<String>, matches: &clap::ArgMatches) 
 
     let insensitive = false;
     for arg in args.skip(1) {
-        if arg.starts_with("--") {
+        if arg.starts_with("-") {
             //Content loading
             if arg == "--insensitive" {
                 current_run.insensitive = true;
@@ -208,12 +217,85 @@ fn get_content_runs(args: std::slice::Iter<String>, matches: &clap::ArgMatches) 
             }
 
             match arg.as_str() {
+                "--content-ext" => { 
+                    if current_run.is_valid() {
+                        content_runs.push(current_run); 
+                    }
+                    current_loader = arg;
+
+                    current_run = ContentRun::new(String::from(current_loader), insensitive);
+                },
+                "-E" => {
+                    if current_run.is_valid() {
+                        content_runs.push(current_run); 
+                    }
+                    current_loader = "--content-ext";
+
+                    current_run = ContentRun::new(String::from(current_loader), insensitive);
+                },
+                "--content-path" => { 
+                    if current_run.is_valid() {
+                        content_runs.push(current_run); 
+                    }
+                    current_loader = arg;
+
+                    current_run = ContentRun::new(String::from(current_loader), insensitive);
+                },
+                "-P" => {
+                    if current_run.is_valid() {
+                        content_runs.push(current_run); 
+                    }
+                    current_loader = "--content-path";
+
+                    current_run = ContentRun::new(String::from(current_loader), insensitive);
+                },
+                "--content-text" => { 
+                    if current_run.is_valid() {
+                        content_runs.push(current_run); 
+                    }
+                    current_loader = arg;
+
+                    current_run = ContentRun::new(String::from(current_loader), insensitive);
+                },
+                "-t" => {
+                    if current_run.is_valid() {
+                        content_runs.push(current_run); 
+                    }
+                    current_loader = "--content-text";
+
+                    current_run = ContentRun::new(String::from(current_loader), insensitive);
+                },
+                "--content-title" => { 
+                    if current_run.is_valid() {
+                        content_runs.push(current_run); 
+                    }
+                    current_loader = arg;
+
+                    current_run = ContentRun::new(String::from(current_loader), insensitive);
+                },
+                "-T" => {
+                    if current_run.is_valid() {
+                        content_runs.push(current_run); 
+                    }
+                    current_loader = "--content-title";
+
+                    current_run = ContentRun::new(String::from(current_loader), insensitive);
+                },
                 //Filter/Scorer
                 "--is" => { current_run.scorers.push(Box::new(search::scorers::Is{}))},
+                "-e" => { current_run.scorers.push(Box::new(search::scorers::Is{}))},
+
                 "--not" =>{ current_run.scorers.push(Box::new(search::scorers::Not{}))},
+                "-n" =>{ current_run.scorers.push(Box::new(search::scorers::Not{}))},
+
                 "--has" =>{ current_run.scorers.push(Box::new(search::scorers::Has{}))},
+                "-h" =>{ current_run.scorers.push(Box::new(search::scorers::Has{}))},
+
                 "--hasnt" =>{ current_run.scorers.push(Box::new(search::scorers::Hasnt{}))},
+                "-H" =>{ current_run.scorers.push(Box::new(search::scorers::Hasnt{}))},
+
                 "--more" =>{ current_run.scorers.push(Box::new(search::scorers::More{}))},
+                "-m" =>{ current_run.scorers.push(Box::new(search::scorers::More{}))},
                 _ =>{ }
             };
 
