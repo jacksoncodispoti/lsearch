@@ -390,8 +390,25 @@ fn get_content(run: &ContentRun, content_loaders: &HashMap<String, Box<dyn searc
     content
 }
 
+fn break_args(args: std::slice::Iter<String>) -> Vec<String> {
+    let mut new_args: Vec<String> = vec![];
+    for arg in args.into_iter() {
+        if arg.starts_with("-") && arg.len() >= 2 && arg.as_bytes()[1] != '-' as u8 {
+           let split: Vec<String> = arg.as_bytes().iter().skip(1)
+               .map(|b| String::from("-") + &String::from(*b as char)).collect();
+           new_args.extend(split);
+        }
+        else {
+            new_args.push(arg.to_string());
+        }
+    }
+    new_args
+}
+
+
 pub fn process_command(path: &str, args: Vec<String>, matches: &clap::ArgMatches) -> u32 {
     let mut path = path::PathBuf::from(path);
+    let args = break_args(args.iter());
     //let command_order = process_command_order(args);
     let runs = get_content_runs(args.iter(), matches);
 
