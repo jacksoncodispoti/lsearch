@@ -500,7 +500,7 @@ pub fn process_command(path: &str, args: Vec<String>, matches: &clap::ArgMatches
             }
         }
         else{
-            let clean_path = match dir_path.strip_prefix(working_dir.as_path().as_os_str().to_str().unwrap()) {
+            let clean_path = match dir_path.strip_prefix(path.as_path().as_os_str().to_str().unwrap()) {
                 Some(str) => if str.len() > 0 { &str[1..] } else { "" },
                 None => ""
             };
