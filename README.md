@@ -1,5 +1,5 @@
 # lsearch
-lsearch is a file search engine. Think of it like a Google (or DuckDuckGo) for files on your own PC! And unlike Google, you can figure it like you want.
+lsearch is a file search engine to help you quickly list and locate certain files on your system.
 ```
 # Look for files with 'hw' in the path, `.tex` extensions and then rank by the number of 'biology' found.
 lsearch --path ~/academic --content-path --has hw --content-ext --is tex --content-text --more biology
