@@ -4,17 +4,21 @@ lsearch is a file search engine. Think of it like a Google (or DuckDuckGo) for f
 # Look for files with 'hw' in the path, `.tex` extensions and then rank by the number of 'biology' found.
 lsearch --path ~/academic --content-path --has hw --content-ext --is tex --content-text --more biology
 ```
+List all files in directory:
+```
+lsearch dir
+```
 Quickly filter files:
 ```
-lsearch -Ee rs
+lsearch -Ee rs # file extension is rs
 ```
 Quickly search files
 ```
-lsearch -th ContentLoader
+lsearch -th ContentLoader file has ContentLoader
 ```
 Quickly create compound actions:
 ```
-lsearch -th ContentLoader -Ee rs
+lsearch -th ContentLoader -Ee rs # file has content loader and file extension is rs
 ```
 # Building
 To build, simply run:
