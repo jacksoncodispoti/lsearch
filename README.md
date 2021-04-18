@@ -7,7 +7,7 @@ lsearch --path ~/academic --content-path --has hw --content-ext --is tex --conte
 Quickly filter files:
 ```
 lsearch -Ee rs
-``
+```
 Quickly search files
 ```
 lsearch -th ContentLoader
