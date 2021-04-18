@@ -4,6 +4,8 @@ use walkdir::WalkDir;
 use search::scorers::fs::{DirEntryFilter, HiddenFilter};
 use std::path;
 use std::fs;
+use std::io::Write;
+use colour;
 
 
 mod stats {
@@ -447,6 +449,7 @@ pub fn process_command(path: &str, args: Vec<String>, matches: &clap::ArgMatches
         .filter_map(|e| e.ok())
         .map(|a|(1.0, a))
         .collect();
+
     let mut next_directories: Vec<(f32, walkdir::DirEntry)>;
 
     for run in runs {
@@ -508,6 +511,32 @@ fn path_rel<'a>(direntry: &'a walkdir::DirEntry, path: &'a path::PathBuf) -> &'a
         None => ""
     }
 }
+
+fn print_dir<'a>(direntry: &'a walkdir::DirEntry, path: &'a path::PathBuf, absolute: bool) -> &'a str {
+    if absolute {
+        let dir_path = path_abs(&direntry);
+
+        println!("{}", dir_path);
+        if direntry.path().is_dir() {
+            colour::green!("{}", dir_path);
+        }
+        else {
+            colour::prnt!("{}", dir_path);
+        }
+        dir_path
+    }
+    else {
+        let dir_path = path_rel(&direntry, path);
+        if direntry.path().is_dir() {
+            colour::green!("{}", dir_path);
+        }
+        else {
+            colour::prnt!("{}", dir_path);
+        }
+        dir_path
+    }
+}
+
 fn linear_print(output_specs: OutputSpecs, path: &path::PathBuf, directories: Vec<(f32, walkdir::DirEntry)>) {
     for (score, direntry) in directories {
         if output_specs.absolute {
@@ -532,24 +561,24 @@ fn grid_print(output_specs: OutputSpecs, path: &path::PathBuf, directories: Vec<
     for (_score, direntry) in directories {
         if x > columns {
             x = 0;
-            println!();
+            colour::white_ln!("");
+            //println!();
         }
 
         if output_specs.absolute {
-            let dir_path = path_abs(&direntry);
-            print!("{}", dir_path);
+            let dir_path = print_dir(&direntry, path, true);
             for _x in (dir_path.len() as u32)..max_width {
                 print!(" ")
             }
         }
         else {
-            let clean_path = path_rel(&direntry, path); 
-            print!("{}", clean_path);
-            for _x in (clean_path.len() as u32)..max_width {
+            let dir_path = print_dir(&direntry, path, false);
+            for _x in (dir_path.len() as u32)..max_width {
                 print!(" ")
             }
         }
 
         x += 1;
     };
+    std::io::stdout().flush().expect("Failed to flush stdout");
 }
