@@ -200,7 +200,7 @@ fn get_content_runs(args: std::slice::Iter<String>, _matches: &clap::ArgMatches)
     for arg in args.skip(1) {
         if arg.starts_with("-") {
             //Content loading
-            if arg == "--insensitive" {
+            if arg == "--insensitive" || arg == "-i" {
                 current_run.insensitive = true;
             }
             if arg.starts_with("--content") {
@@ -363,7 +363,10 @@ fn get_file_traverse_specs(args: std::slice::Iter<String>) -> FileTraverseSpecs 
     for arg in args {
         match arg.as_str() {
             "--recursive" => { recursive = true; },
+            "-r" => { recursive = true; },
             "--hidden" => { hidden = true; },
+            "-a" => { hidden = true; },
+
             _ => {}
         }
     }

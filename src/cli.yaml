@@ -103,6 +103,7 @@ args:
                 takes_value: false
                 about: Recursivelly descend
         - hidden:
+                short: a
                 long: hidden
                 multiple: false
                 takes_value: false
@@ -110,6 +111,7 @@ args:
 
         #Output formatting
         - absolute:
+                short: A
                 long: absolute
                 multiple: false
                 takes_value: false
