@@ -405,6 +405,14 @@ fn break_args(args: std::slice::Iter<String>) -> Vec<String> {
     new_args
 }
 
+fn print_direntries(output_specs: OutputSpecs, matches: &clap::ArgMatches, path: &path::PathBuf, directories: Vec<(f32, walkdir::DirEntry)>) {
+    if matches.is_present("score") {
+        linear_print(output_specs, path, directories);
+    }
+    else {
+        grid_print(output_specs, path, directories);
+    }
+}
 
 pub fn process_command(path: &str, args: Vec<String>, matches: &clap::ArgMatches) -> u32 {
     let mut path = path::PathBuf::from(path);
@@ -522,7 +530,7 @@ fn linear_print(output_specs: OutputSpecs, path: &path::PathBuf, directories: Ve
 
 fn grid_print(output_specs: OutputSpecs, path: &path::PathBuf, directories: Vec<(f32, walkdir::DirEntry)>) {
     const max_line: u32 = 80;
-    let max_width: u32 = directories.iter().map(|x| if output_specs.absolute { path_abs(&x.1) } else { path_rel(&x.1, path) }.len()).max().unwrap() as u32;
+    let max_width: u32 = directories.iter().map(|x| if output_specs.absolute { path_abs(&x.1) } else { path_rel(&x.1, path) }.len()).max().unwrap() as u32 + 5;
     
     let columns = max_line / max_width;
     
@@ -536,24 +544,19 @@ fn grid_print(output_specs: OutputSpecs, path: &path::PathBuf, directories: Vec<
 
         if output_specs.absolute {
             let dir_path = path_abs(&direntry);
-            print!("{:^10}", dir_path);
+            print!("{}", dir_path);
+            for x in (dir_path.len() as u32)..max_width {
+                print!(" ")
+            }
         }
         else {
             let clean_path = path_rel(&direntry, path); 
-            print!("{:^10}", clean_path);
+            print!("{}", clean_path);
+            for x in (clean_path.len() as u32)..max_width {
+                print!(" ")
+            }
         }
 
         x += 1;
-    }
-}
-
-
-
-fn print_direntries(output_specs: OutputSpecs, matches: &clap::ArgMatches, path: &path::PathBuf, directories: Vec<(f32, walkdir::DirEntry)>) {
-    if matches.is_present("score") {
-        linear_print(output_specs, path, directories);
-    }
-    else {
-        grid_print(output_specs, path, directories);
-    }
+    };
 }
