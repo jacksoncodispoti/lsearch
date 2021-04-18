@@ -488,34 +488,73 @@ pub fn process_command(path: &str, args: Vec<String>, matches: &clap::ArgMatches
     
     let working_dir = std::env::current_dir().unwrap();
 
-    for (score, direntry) in directories {
-        let dir_path = direntry.path().as_os_str().to_str().unwrap();
-        
-        if output_specs.absolute{
-            if matches.is_present("score") {
-                println!("[{}] {}", score, dir_path);
-            }
-            else{
-                println!("{}", dir_path);
-            }
-        }
-        else{
-            let clean_path = match dir_path.strip_prefix(path.as_path().as_os_str().to_str().unwrap()) {
-                Some(str) => if str.len() > 0 { &str[1..] } else { "" },
-                None => ""
-            };
-
-            if matches.is_present("score") {
-                println!("[{}] {}", score, clean_path);
-            }
-            else{
-                println!("{}", clean_path);
-            }
-        }
-    }
+    print_direntries(output_specs, matches, &path, directories);
 
     if matches.is_present("stats") {
         print!("{}", app_stats);
     }
     0
+}
+
+fn path_abs(direntry: &walkdir::DirEntry) -> &str {
+    direntry.path().as_os_str().to_str().unwrap()
+}
+fn path_rel<'a>(direntry: &'a walkdir::DirEntry, path: &'a path::PathBuf) -> &'a str {
+    let dir_path = direntry.path().as_os_str().to_str().unwrap();
+    match dir_path.strip_prefix(path.as_path().as_os_str().to_str().unwrap()) {
+        Some(str) => if str.len() > 0 { &str[1..] } else { "" },
+        None => ""
+    }
+}
+fn linear_print(output_specs: OutputSpecs, path: &path::PathBuf, directories: Vec<(f32, walkdir::DirEntry)>) {
+    for (score, direntry) in directories {
+        let dir_path = direntry.path().as_os_str().to_str().unwrap();
+        if output_specs.absolute {
+            let dir_path = path_abs(&direntry);
+            println!("[{}] {}", score, dir_path);
+        }
+        else {
+            let clean_path = path_rel(&direntry, path); 
+            println!("[{}] {}", score, clean_path);
+        }
+    }
+}
+
+fn grid_print(output_specs: OutputSpecs, path: &path::PathBuf, directories: Vec<(f32, walkdir::DirEntry)>) {
+    const max_line: u32 = 80;
+    let max_width: u32 = directories.iter().map(|x| if output_specs.absolute { path_abs(&x.1) } else { path_rel(&x.1, path) }.len()).max().unwrap() as u32;
+    
+    let columns = max_line / max_width;
+    
+    let mut x = 0;
+
+    println!("There should be {} {} {}clumns", columns, max_line, max_width);
+    for (score, direntry) in directories {
+        if x > columns {
+            x = 0;
+            println!();
+        }
+
+        if output_specs.absolute {
+            let dir_path = path_abs(&direntry);
+            print!("{:^10}", dir_path);
+        }
+        else {
+            let clean_path = path_rel(&direntry, path); 
+            print!("{:^10}", clean_path);
+        }
+
+        x += 1;
+    }
+}
+
+
+
+fn print_direntries(output_specs: OutputSpecs, matches: &clap::ArgMatches, path: &path::PathBuf, directories: Vec<(f32, walkdir::DirEntry)>) {
+    if matches.is_present("score") {
+        linear_print(output_specs, path, directories);
+    }
+    else {
+        grid_print(output_specs, path, directories);
+    }
 }
