@@ -4,7 +4,18 @@ lsearch is a file search engine. Think of it like a Google (or DuckDuckGo) for f
 # Look for files with 'hw' in the path, `.tex` extensions and then rank by the number of 'biology' found.
 lsearch --path ~/academic --content-path --has hw --content-ext --is tex --content-text --more biology
 ```
-
+Quickly filter files:
+```
+lsearch -Ee rs
+``
+Quickly search files
+```
+lsearch -th ContentLoader
+```
+Quickly create compound actions:
+```
+lsearch -th ContentLoader -Ee rs
+```
 # Building
 To build, simply run:
 ```
@@ -36,10 +47,10 @@ There are several types of content. Listed are some below:
 
 |Content Type|Content|
 |---|---|
-|--content-path|/home/jackson/testfile.txt|
-|--content-title|testfile|
-|--content-ext|txt|
-|--content-text|Hello there!|
+|--content-path, -P|/home/jackson/testfile.txt|
+|--content-title, -T|testfile|
+|--content-ext, -E|txt|
+|--content-text, -t|Hello there!|
 |--context-exif|[planned]|
 |--content-exec|[planned]|
 
@@ -48,15 +59,15 @@ Below are the content scorers in lsearch:
 
 |Scorer|Definition|
 |---|---|
-|--more [arg]|sum(1 for [arg] in content)|
+|--more, -m [arg]|sum(1 for [arg] in content)|
 
 ## Content Filters
 Below are some content filters:
 
 |Filter|Definition|
 |---|--|
-|--is [arg]|content == [arg]|
-|--not [arg]|content != [arg]|
-|--has [arg]| [arg] in content |
-|--hasnt [arg]| [arg] not in content|
+|--is, -e [arg]|content == [arg]|
+|--not, -n [arg]|content != [arg]|
+|--has, -h [arg]| [arg] in content |
+|--hasnt, -H [arg]| [arg] not in content|
 
