@@ -154,7 +154,6 @@ fn get_content_loaders(loaders: std::slice::Iter<String>) -> HashMap<String, Box
             content_loaders.insert(String::from(loader), 
                                    match loader.as_str() {
                                        "--content-path" => { Box::new(search::loaders::PathLoader::new()) },
-                                       "--content-path" => { Box::new(search::loaders::PathLoader::new()) },
                                        "--content-title" => {Box::new(search::loaders::TitleLoader::new())},
                                        "--content-ext" => {Box::new(search::loaders::ExtLoader::new())},
                                        "-E" => {Box::new(search::loaders::ExtLoader::new())},
@@ -190,10 +189,7 @@ impl ContentRun {
     }
 }
 
-fn is_is(s: &str) -> bool {
-    true
-}
-fn get_content_runs(args: std::slice::Iter<String>, matches: &clap::ArgMatches) -> Vec<ContentRun> {
+fn get_content_runs(args: std::slice::Iter<String>, _matches: &clap::ArgMatches) -> Vec<ContentRun> {
     let mut current_loader = "--content-title";
     let mut current_run: ContentRun = ContentRun{content_loader: String::from(current_loader), scorers: Vec::new(), targets: Vec::new(), insensitive: true};
     let mut content_runs: Vec<ContentRun> = Vec::new();
@@ -373,7 +369,7 @@ fn get_file_traverse_specs(args: std::slice::Iter<String>) -> FileTraverseSpecs 
     return FileTraverseSpecs::new(recursive, hidden);
 }
 
-fn get_output_specs(args: std::slice::Iter<String>, matches: &clap::ArgMatches) -> OutputSpecs {
+fn get_output_specs(_args: std::slice::Iter<String>, matches: &clap::ArgMatches) -> OutputSpecs {
     let absolute = matches.is_present("absolute");
 
     return OutputSpecs::new(absolute);
@@ -494,8 +490,6 @@ pub fn process_command(path: &str, args: Vec<String>, matches: &clap::ArgMatches
         app_stats.push_run(run_stats);
     }
     
-    let working_dir = std::env::current_dir().unwrap();
-
     print_direntries(output_specs, matches, &path, directories);
 
     if matches.is_present("stats") {
@@ -516,7 +510,6 @@ fn path_rel<'a>(direntry: &'a walkdir::DirEntry, path: &'a path::PathBuf) -> &'a
 }
 fn linear_print(output_specs: OutputSpecs, path: &path::PathBuf, directories: Vec<(f32, walkdir::DirEntry)>) {
     for (score, direntry) in directories {
-        let dir_path = direntry.path().as_os_str().to_str().unwrap();
         if output_specs.absolute {
             let dir_path = path_abs(&direntry);
             println!("[{}] {}", score, dir_path);
@@ -529,14 +522,14 @@ fn linear_print(output_specs: OutputSpecs, path: &path::PathBuf, directories: Ve
 }
 
 fn grid_print(output_specs: OutputSpecs, path: &path::PathBuf, directories: Vec<(f32, walkdir::DirEntry)>) {
-    const max_line: u32 = 80;
+    const MAX_LINE: u32 = 80;
     let max_width: u32 = directories.iter().map(|x| if output_specs.absolute { path_abs(&x.1) } else { path_rel(&x.1, path) }.len()).max().unwrap() as u32 + 5;
     
-    let columns = max_line / max_width;
+    let columns = MAX_LINE / max_width;
     
     let mut x = 0;
 
-    for (score, direntry) in directories {
+    for (_score, direntry) in directories {
         if x > columns {
             x = 0;
             println!();
@@ -545,14 +538,14 @@ fn grid_print(output_specs: OutputSpecs, path: &path::PathBuf, directories: Vec<
         if output_specs.absolute {
             let dir_path = path_abs(&direntry);
             print!("{}", dir_path);
-            for x in (dir_path.len() as u32)..max_width {
+            for _x in (dir_path.len() as u32)..max_width {
                 print!(" ")
             }
         }
         else {
             let clean_path = path_rel(&direntry, path); 
             print!("{}", clean_path);
-            for x in (clean_path.len() as u32)..max_width {
+            for _x in (clean_path.len() as u32)..max_width {
                 print!(" ")
             }
         }
