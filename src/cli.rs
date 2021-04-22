@@ -153,9 +153,11 @@ fn get_content_loaders(loaders: std::slice::Iter<String>) -> HashMap<String, Box
     for loader in loaders {
         //Path based
         if !content_loaders.contains_key(&String::from(loader)) {
+           println!("TItleloader: [{}]", loader);
             content_loaders.insert(String::from(loader), 
                                    match loader.as_str() {
                                        "content-path" => { Box::new(search::loaders::PathLoader::new()) },
+                                       "content-text" => { Box::new(search::loaders::TextLoader::new()) },
                                        "content-title" => {Box::new(search::loaders::TitleLoader::new())},
                                        "content-ext" => {Box::new(search::loaders::ExtLoader::new())},
                                        _ =>  {Box::new(search::loaders::TitleLoader::new())}
