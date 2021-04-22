@@ -361,7 +361,8 @@ struct FileTraverseSpecs {
 }
 
 struct OutputSpecs {
-    absolute: bool
+    absolute: bool,
+    score: bool 
 }
 
 impl FileTraverseSpecs {
@@ -371,8 +372,8 @@ impl FileTraverseSpecs {
 }
 
 impl OutputSpecs {
-    fn new(absolute: bool) -> OutputSpecs {
-        OutputSpecs{ absolute: absolute }
+    fn new(absolute: bool, score: bool) -> OutputSpecs {
+        OutputSpecs{ absolute: absolute, score: score }
     }
 }
 
@@ -385,8 +386,9 @@ fn get_file_traverse_specs(matches: &clap::ArgMatches) -> FileTraverseSpecs {
 
 fn get_output_specs(matches: &clap::ArgMatches) -> OutputSpecs {
     let absolute = matches.is_present("absolute");
+    let score = matches.is_present("score");
 
-    return OutputSpecs::new(absolute);
+    return OutputSpecs::new(absolute, score);
 }
 
 fn get_content(run: &ContentRun, content_loaders: &HashMap<String, Box<dyn search::loaders::ContentLoader>>, direntry: &walkdir::DirEntry) -> String {
@@ -398,15 +400,6 @@ fn get_content(run: &ContentRun, content_loaders: &HashMap<String, Box<dyn searc
     }
 
     content
-}
-
-fn print_direntries(output_specs: OutputSpecs, matches: &clap::ArgMatches, path: &path::PathBuf, directories: Vec<(f32, walkdir::DirEntry)>) {
-    if matches.is_present("score") {
-        linear_print(output_specs, path, directories);
-    }
-    else {
-        grid_print(output_specs, path, directories);
-    }
 }
 
 pub fn process_command(path: &str, args: Vec<String>, matches: &clap::ArgMatches) -> u32 {
@@ -490,12 +483,21 @@ pub fn process_command(path: &str, args: Vec<String>, matches: &clap::ArgMatches
         app_stats.push_run(run_stats);
     }
     
-    print_direntries(output_specs, matches, &path, directories);
+    print_direntries(output_specs, &path, directories);
 
     if matches.is_present("stats") {
         print!("{}", app_stats);
     }
     0
+}
+
+fn print_direntries(output_specs: OutputSpecs, path: &path::PathBuf, directories: Vec<(f32, walkdir::DirEntry)>) {
+    if output_specs.score {
+        linear_print(output_specs, path, directories);
+    }
+    else {
+        grid_print(output_specs, path, directories);
+    }
 }
 
 fn path_abs(direntry: &walkdir::DirEntry) -> &str {
@@ -534,17 +536,49 @@ fn print_dir<'a>(direntry: &'a walkdir::DirEntry, path: &'a path::PathBuf, absol
     }
 }
 
-fn linear_print(output_specs: OutputSpecs, path: &path::PathBuf, directories: Vec<(f32, walkdir::DirEntry)>) {
-    for (score, direntry) in directories {
+trait PrintlnFormatter {
+    fn print(&self, score: &f32, path: &path::PathBuf, direntry: &walkdir::DirEntry, output_specs: &OutputSpecs);
+}
+
+struct ScoreFormatter { }
+impl PrintlnFormatter for ScoreFormatter {
+    fn print(&self, score: &f32, path: &path::PathBuf, direntry: &walkdir::DirEntry, output_specs: &OutputSpecs) {
         if output_specs.absolute {
             let dir_path = path_abs(&direntry);
-            println!("[{}] {}", score, dir_path);
+            println!("[{}]{}", score, dir_path);
         }
         else {
             let clean_path = path_rel(&direntry, path); 
             println!("[{}] {}", score, clean_path);
         }
     }
+}
+
+struct StdFormatter { }
+impl PrintlnFormatter for StdFormatter {
+    fn print(&self, score: &f32, path: &path::PathBuf, direntry: &walkdir::DirEntry, output_specs: &OutputSpecs) {
+        if output_specs.absolute {
+            let dir_path = path_abs(&direntry);
+            println!("{}",  dir_path);
+        }
+        else {
+            let clean_path = path_rel(&direntry, path); 
+            println!("{}", clean_path);
+        }
+    }
+}
+
+fn linear_print(output_specs: OutputSpecs, path: &path::PathBuf, directories: Vec<(f32, walkdir::DirEntry)>) {
+    let formatter: Box<dyn PrintlnFormatter> = if output_specs.score {
+            Box::new(ScoreFormatter {})
+        }
+        else {
+            Box::new(StdFormatter {})
+        };
+
+        for (score, direntry) in directories {
+            formatter.print(&score, path, &direntry, &output_specs);
+        }
 }
 
 fn grid_print(output_specs: OutputSpecs, path: &path::PathBuf, directories: Vec<(f32, walkdir::DirEntry)>) {
