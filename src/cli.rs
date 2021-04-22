@@ -155,10 +155,9 @@ fn get_content_loaders(loaders: std::slice::Iter<String>) -> HashMap<String, Box
         if !content_loaders.contains_key(&String::from(loader)) {
             content_loaders.insert(String::from(loader), 
                                    match loader.as_str() {
-                                       "--content-path" => { Box::new(search::loaders::PathLoader::new()) },
-                                       "--content-title" => {Box::new(search::loaders::TitleLoader::new())},
-                                       "--content-ext" => {Box::new(search::loaders::ExtLoader::new())},
-                                       "-E" => {Box::new(search::loaders::ExtLoader::new())},
+                                       "content-path" => { Box::new(search::loaders::PathLoader::new()) },
+                                       "content-title" => {Box::new(search::loaders::TitleLoader::new())},
+                                       "content-ext" => {Box::new(search::loaders::ExtLoader::new())},
                                        _ =>  {Box::new(search::loaders::TitleLoader::new())}
                                    });
         }
@@ -191,117 +190,137 @@ impl ContentRun {
     }
 }
 
-fn get_content_runs(args: std::slice::Iter<String>, _matches: &clap::ArgMatches) -> Vec<ContentRun> {
+struct Arg {
+    pub short: char,
+    pub long: String,
+    value: Option<String>
+}
+
+impl Arg {
+    fn new(short: char, long: &str) -> Arg {
+        Arg{short: short, long: String::from(long), value: None} 
+    }
+
+    fn is(&self, other: &str) -> bool {
+        let first_char = other.chars().next().unwrap();
+        if other.starts_with("--") {
+            return self.long == &other[2..];
+        }
+        else if other.starts_with("-") {
+            return self.short == first_char;
+        }
+        else {
+            return self.long == other || if other.len() == 1 { self.short == first_char } else { false };
+        }
+    }
+
+    fn set_value(&mut self, other: &str) {
+        self.value = Some(String::from(other));
+    }
+
+    fn get_value(&self) -> Option<String> {
+        match &self.value {
+            Some(val) => Some(String::from(val)),
+            None => None
+        }
+    }
+}
+
+
+fn parse_args(args: std::slice::Iter<String>) -> Vec<Arg> {
+    let arg_lookup: Vec<(char, &str)> = vec![
+        ('A', "absolute"),
+        ('E', "content-ext"),
+        ('P', "content-path"),
+        ('t', "content-text"),
+        ('T', "content-title"),
+        ('\0', "echo"),
+        ('\0', "help"),
+        ('a', "hidden"),
+        ('i', "insensitive"),
+        ('r', "recursive"),
+        ('\0', "score"),
+        ('\0', "stats"),
+        ('\0', "strats"),
+        ('V', "version"),
+        ('h', "has"),
+        ('H', "hasnt"),
+        ('e', "is"),
+        ('l', "less"),
+        ('m', "more"),
+        ('n', "not")
+    ];
+
+    let mut parsed_args: Vec<Arg> = vec![];
+
+    for arg in args {
+        if arg.starts_with("--") {
+           let arg = arg_lookup.iter().find(|a|a.1==&arg[2..]).unwrap();
+           parsed_args.push(Arg::new(arg.0, arg.1));
+        }
+        else if arg.starts_with("-") {
+           let split: Vec<char> = arg.as_bytes().iter().skip(1)
+               .map(|b| *b as char).collect();
+
+           for sub_arg in split {
+               let arg = arg_lookup.iter().find(|a|a.0==sub_arg).unwrap();
+               parsed_args.push(Arg::new(arg.0, arg.1));
+           }
+        }
+        else {
+            match parsed_args.last_mut() {
+                Some(parsed_arg) => { parsed_arg.set_value(arg); }
+                None => {}
+            };
+        }
+    }
+
+    parsed_args
+}
+
+fn get_content_runs(args: std::slice::Iter<Arg>, _matches: &clap::ArgMatches) -> Vec<ContentRun> {
     let mut current_loader = "--content-title";
     let mut current_run: ContentRun = ContentRun{content_loader: String::from(current_loader), scorers: Vec::new(), targets: Vec::new(), insensitive: true};
     let mut content_runs: Vec<ContentRun> = Vec::new();
 
     let insensitive = false;
-    for arg in args.skip(1) {
-        if arg.starts_with("-") {
-            //Content loading
-            if arg == "--insensitive" || arg == "-i" {
+    for arg in args {
+        if arg.is("insensitive") {
                 current_run.insensitive = true;
-            }
-            if arg.starts_with("--content") {
-                current_loader = arg;
-
-                if current_run.is_valid() {
-                    content_runs.push(current_run);
-                }
-
-                current_run = ContentRun{content_loader: String::from(current_loader), scorers: Vec::new(), targets: Vec::new(), insensitive: insensitive};
-                continue;
+        }
+        else if arg.is("content-ext")
+            || arg.is("content-path")
+            || arg.is("content-text")
+            || arg.is("content-title") {
+            current_loader = &arg.long;
+            if current_run.is_valid() {
+                content_runs.push(current_run);
             }
 
-            match arg.as_str() {
-                "--content-ext" => { 
-                    if current_run.is_valid() {
-                        content_runs.push(current_run); 
-                    }
-                    current_loader = arg;
-
-                    current_run = ContentRun::new(String::from(current_loader), insensitive);
-                },
-                "-E" => {
-                    if current_run.is_valid() {
-                        content_runs.push(current_run); 
-                    }
-                    current_loader = "--content-ext";
-
-                    current_run = ContentRun::new(String::from(current_loader), insensitive);
-                },
-                "--content-path" => { 
-                    if current_run.is_valid() {
-                        content_runs.push(current_run); 
-                    }
-                    current_loader = arg;
-
-                    current_run = ContentRun::new(String::from(current_loader), insensitive);
-                },
-                "-P" => {
-                    if current_run.is_valid() {
-                        content_runs.push(current_run); 
-                    }
-                    current_loader = "--content-path";
-
-                    current_run = ContentRun::new(String::from(current_loader), insensitive);
-                },
-                "--content-text" => { 
-                    if current_run.is_valid() {
-                        content_runs.push(current_run); 
-                    }
-                    current_loader = arg;
-
-                    current_run = ContentRun::new(String::from(current_loader), insensitive);
-                },
-                "-t" => {
-                    if current_run.is_valid() {
-                        content_runs.push(current_run); 
-                    }
-                    current_loader = "--content-text";
-
-                    current_run = ContentRun::new(String::from(current_loader), insensitive);
-                },
-                "--content-title" => { 
-                    if current_run.is_valid() {
-                        content_runs.push(current_run); 
-                    }
-                    current_loader = arg;
-
-                    current_run = ContentRun::new(String::from(current_loader), insensitive);
-                },
-                "-T" => {
-                    if current_run.is_valid() {
-                        content_runs.push(current_run); 
-                    }
-                    current_loader = "--content-title";
-
-                    current_run = ContentRun::new(String::from(current_loader), insensitive);
-                },
-                //Filter/Scorer
-                "--is" => { current_run.scorers.push(Box::new(search::scorers::Is{}))},
-                "-e" => { current_run.scorers.push(Box::new(search::scorers::Is{}))},
-
-                "--not" =>{ current_run.scorers.push(Box::new(search::scorers::Not{}))},
-                "-n" =>{ current_run.scorers.push(Box::new(search::scorers::Not{}))},
-
-                "--has" =>{ current_run.scorers.push(Box::new(search::scorers::Has{}))},
-                "-h" =>{ current_run.scorers.push(Box::new(search::scorers::Has{}))},
-
-                "--hasnt" =>{ current_run.scorers.push(Box::new(search::scorers::Hasnt{}))},
-                "-H" =>{ current_run.scorers.push(Box::new(search::scorers::Hasnt{}))},
-
-                "--more" =>{ current_run.scorers.push(Box::new(search::scorers::More{}))},
-                "-m" =>{ current_run.scorers.push(Box::new(search::scorers::More{}))},
-                _ =>{ }
-            };
-
-            continue;
+            current_run = ContentRun{content_loader: String::from(current_loader), scorers: Vec::new(), targets: Vec::new(), insensitive: insensitive};
+        }
+        else if arg.is("is") {
+            current_run.scorers.push(Box::new(search::scorers::Is{}));
+        }
+        else if arg.is("not") {
+            current_run.scorers.push(Box::new(search::scorers::Not{}));
+        }
+        else if arg.is("has") {
+            current_run.scorers.push(Box::new(search::scorers::Has{}));
+        }
+        else if arg.is("hasnt") {
+            current_run.scorers.push(Box::new(search::scorers::Hasnt{}));
+        }
+        else if arg.is("more") {
+            current_run.scorers.push(Box::new(search::scorers::More{}));
         }
 
-        current_run.targets.push(String::from(arg));
+        match arg.get_value() {
+            Some(s) => { current_run.targets.push(s); },
+            None => {}
+        };
     }
+
     if current_run.is_valid() {
         content_runs.push(current_run);
     }
@@ -356,25 +375,14 @@ impl OutputSpecs {
     }
 }
 
-fn get_file_traverse_specs(args: std::slice::Iter<String>) -> FileTraverseSpecs {
-    let mut recursive = false;
-    let mut hidden = false;
-
-    for arg in args {
-        match arg.as_str() {
-            "--recursive" => { recursive = true; },
-            "-r" => { recursive = true; },
-            "--hidden" => { hidden = true; },
-            "-a" => { hidden = true; },
-
-            _ => {}
-        }
-    }
+fn get_file_traverse_specs(matches: &clap::ArgMatches) -> FileTraverseSpecs {
+    let recursive = matches.is_present("recursive");
+    let hidden = matches.is_present("hidden");
 
     return FileTraverseSpecs::new(recursive, hidden);
 }
 
-fn get_output_specs(_args: std::slice::Iter<String>, matches: &clap::ArgMatches) -> OutputSpecs {
+fn get_output_specs(matches: &clap::ArgMatches) -> OutputSpecs {
     let absolute = matches.is_present("absolute");
 
     return OutputSpecs::new(absolute);
@@ -391,21 +399,6 @@ fn get_content(run: &ContentRun, content_loaders: &HashMap<String, Box<dyn searc
     content
 }
 
-fn break_args(args: std::slice::Iter<String>) -> Vec<String> {
-    let mut new_args: Vec<String> = vec![];
-    for arg in args.into_iter() {
-        if arg.starts_with("-") && arg.len() >= 2 && arg.as_bytes()[1] != '-' as u8 {
-           let split: Vec<String> = arg.as_bytes().iter().skip(1)
-               .map(|b| String::from("-") + &String::from(*b as char)).collect();
-           new_args.extend(split);
-        }
-        else {
-            new_args.push(arg.to_string());
-        }
-    }
-    new_args
-}
-
 fn print_direntries(output_specs: OutputSpecs, matches: &clap::ArgMatches, path: &path::PathBuf, directories: Vec<(f32, walkdir::DirEntry)>) {
     if matches.is_present("score") {
         linear_print(output_specs, path, directories);
@@ -417,12 +410,12 @@ fn print_direntries(output_specs: OutputSpecs, matches: &clap::ArgMatches, path:
 
 pub fn process_command(path: &str, args: Vec<String>, matches: &clap::ArgMatches) -> u32 {
     let mut path = path::PathBuf::from(path);
-    let args = break_args(args.iter());
+    let args = parse_args(args.iter());
     //let command_order = process_command_order(args);
     let runs = get_content_runs(args.iter(), matches);
 
-    let traverse_specs = get_file_traverse_specs(args.iter());
-    let output_specs = get_output_specs(args.iter(), matches);
+    let traverse_specs = get_file_traverse_specs(matches);
+    let output_specs = get_output_specs(matches);
     let loader_names: Vec<String> = runs.iter().map(|r| String::from(&r.content_loader)).collect();
     let content_loaders = get_content_loaders(loader_names.iter());
     //
@@ -437,7 +430,7 @@ pub fn process_command(path: &str, args: Vec<String>, matches: &clap::ArgMatches
         println!("\tls {:?}", path);
     }
 
-    if matches.is_present("--strats") {
+    if matches.is_present("strats") {
         summarize_runs(runs.iter());
     }
 
@@ -555,7 +548,14 @@ fn linear_print(output_specs: OutputSpecs, path: &path::PathBuf, directories: Ve
 
 fn grid_print(output_specs: OutputSpecs, path: &path::PathBuf, directories: Vec<(f32, walkdir::DirEntry)>) {
     const MAX_LINE: u32 = 80;
-    let max_width: u32 = directories.iter().map(|x| if output_specs.absolute { path_abs(&x.1) } else { path_rel(&x.1, path) }.len()).max().unwrap() as u32 + 5;
+    if directories.len() == 0 {
+        return;
+    }
+
+    let max_width: u32 = directories.iter()
+        .map(|x| if output_specs.absolute { path_abs(&x.1) } else { path_rel(&x.1, path) }.len())
+        .max()
+        .unwrap() as u32 + 5;
     
     let columns = MAX_LINE / max_width;
     
