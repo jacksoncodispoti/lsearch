@@ -430,10 +430,6 @@ pub fn process_command(path: &str, args: Vec<String>, matches: &clap::ArgMatches
         println!("\tls {:?}", path);
     }
 
-    if matches.is_present("strats") {
-        summarize_runs(runs.iter());
-    }
-
     let hidden_filter = HiddenFilter::new(traverse_specs.hidden);
 
     let directories = match traverse_specs.recursive {
@@ -490,6 +486,10 @@ pub fn process_command(path: &str, args: Vec<String>, matches: &clap::ArgMatches
     }
     
     print_direntries(output_specs, matches, &path, directories);
+
+    if matches.is_present("strats") {
+        summarize_runs(runs.iter());
+    }
 
     if matches.is_present("stats") {
         print!("{}", app_stats);
