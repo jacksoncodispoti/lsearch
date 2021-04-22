@@ -14,7 +14,7 @@ lsearch -Ee rs # file extension is rs
 ```
 Quickly search files
 ```
-lsearch -th # ContentLoader file has ContentLoader
+lsearch -th ContentLoader # file has ContentLoader
 ```
 Quickly create compound actions:
 ```
