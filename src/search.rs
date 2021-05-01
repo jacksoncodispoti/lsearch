@@ -2,63 +2,88 @@ pub mod loaders {
     use std::fs::File;
     use std::io::prelude::*;
     use std::io::BufReader;
+    use std::process::Command;
+
     pub trait ContentLoader {
         fn load_content(&self, entry: &walkdir::DirEntry) -> String;
+        fn get_name(&self) -> &str;
     }
 
-    pub struct TitleLoader { 
+    pub fn parse(arg: &str) -> Option<Box<dyn ContentLoader>> {
+       match arg {
+           "content-path" => Some(Box::new(ContentPath::new())),
+           "content-text" => Some(Box::new(ContentText::new())),
+           "content-title" => Some(Box::new(ContentTitle::new())),
+           "content-ext" => Some(Box::new(ContentExt::new())),
+           _ => None 
+       }
+   }
+
+    pub struct ContentTitle { 
     }
-    impl TitleLoader {
-        pub fn new() -> TitleLoader {
-            TitleLoader{}
+    impl ContentTitle {
+        pub fn new() -> ContentTitle {
+            ContentTitle{}
         }
     }
-    impl ContentLoader for TitleLoader {
+    impl ContentLoader for ContentTitle {
         fn load_content(&self, entry: &walkdir::DirEntry) -> String {
             String::from(match entry.file_name().to_str() {
-                Some(file_name) => {file_name},
+                Some(file_name) => {println!("{}", file_name);file_name},
                 None => { "" }
             })
         }
-    }
 
-    pub struct PathLoader {
-    }
-    impl PathLoader {
-        pub fn new() -> PathLoader {
-            PathLoader{}
+        fn get_name(&self) -> &str {
+            "content-title"
         }
     }
-    impl ContentLoader for PathLoader {
+
+    pub struct ContentPath {
+    }
+    impl ContentPath {
+        pub fn new() -> ContentPath {
+            ContentPath{}
+        }
+    }
+    impl ContentLoader for ContentPath {
         fn load_content(&self, entry: &walkdir::DirEntry) -> String {
             String::from(entry.path().to_str().unwrap())
         }
-    }
 
-    pub struct ExtLoader {
-    }
-    impl ExtLoader {
-        pub fn new() -> ExtLoader {
-            ExtLoader{}
+        fn get_name(&self) -> &str {
+            "content-path"
         }
     }
-    impl ContentLoader for ExtLoader {
+
+    pub struct ContentExt {
+    }
+    impl ContentExt {
+        pub fn new() -> ContentExt {
+            ContentExt{}
+        }
+    }
+    impl ContentLoader for ContentExt {
         fn load_content(&self, entry: &walkdir::DirEntry) -> String {
             match entry.path().extension() {
                 Some(ext) => { return String::from(ext.to_str().unwrap());}
                 None => { return String::from(""); }
             }
         }
-    }
 
-    pub struct TextLoader { 
-    }
-    impl TextLoader {
-        pub fn new() -> TextLoader {
-            TextLoader{}
+        fn get_name(&self) -> &str {
+            "content-ext"
         }
     }
-    impl ContentLoader for TextLoader {
+
+    pub struct ContentText { 
+    }
+    impl ContentText {
+        pub fn new() -> ContentText {
+            ContentText{}
+        }
+    }
+    impl ContentLoader for ContentText {
         fn load_content(&self, entry: &walkdir::DirEntry) -> String {
             if entry.path().is_dir() {
                 return String::new();
@@ -70,6 +95,40 @@ pub mod loaders {
                 buf_reader.read_to_string(&mut contents).expect("Failed to read contents");
                 contents
             }
+        }
+
+        fn get_name(&self) -> &str {
+            "content-text"
+        }
+    }
+
+    pub struct ContentExec {
+        command: String 
+    }
+    impl ContentExec {
+        pub fn new(command: &'_ str) -> ContentExec {
+            ContentExec{command: String::from(command)}
+        }
+    }
+    impl ContentLoader for ContentExec {
+        fn load_content(&self, entry: &walkdir::DirEntry) -> String {
+            let mut i = self.command.split(' ');
+            let mut cmd = Command::new(i.next().unwrap());
+            while let Some(arg) = i.next() {
+                cmd.arg(arg); 
+            }
+            
+            if let Some(file_name) = entry.file_name().to_str() {
+                cmd.arg(file_name);
+                String::from_utf8(cmd.output().expect("Failed to run process").stdout).expect("Unable to parse output")
+            }
+            else {
+                String::new()
+            }
+        }
+
+        fn get_name(&self) -> &str {
+            "content-exec"
         }
     }
 }

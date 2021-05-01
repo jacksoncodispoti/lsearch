@@ -6,6 +6,11 @@ use std::path;
 use std::fs;
 use std::io::Write;
 use colour;
+use std::os::unix::fs::MetadataExt;
+use bit_field::BitField;
+use std::time::{SystemTime, UNIX_EPOCH};
+use chrono::naive::NaiveDateTime;
+use chrono::DateTime;
 
 
 mod stats {
@@ -105,7 +110,7 @@ mod stats {
                 operations: HashMap::new(), 
                 operation_order: operation_order,
                 targets: targets,
-                content_loader: String::from(&run.content_loader),
+                content_loader: String::from(run.content_loader.get_name()),
                 avg_length: 0.0, 
                 n: 0,
                 time: 0,
@@ -141,39 +146,18 @@ mod stats {
 }
 
 pub struct ContentRun {
-    content_loader: String,
+    content_loader: Box<dyn search::loaders::ContentLoader>,
     scorers: Vec<Box<dyn search::scorers::ContentScorer>>,
     targets: Vec<String>,
     insensitive: bool
 }
 
-fn get_content_loaders(loaders: std::slice::Iter<String>) -> HashMap<String, Box<dyn search::loaders::ContentLoader>> {
-    let mut content_loaders: HashMap<String, Box<dyn search::loaders::ContentLoader>> = HashMap::new();
-
-    for loader in loaders {
-        //Path based
-        if !content_loaders.contains_key(&String::from(loader)) {
-            content_loaders.insert(String::from(loader), 
-                                   match loader.as_str() {
-                                       "content-path" => { Box::new(search::loaders::PathLoader::new()) },
-                                       "content-text" => { Box::new(search::loaders::TextLoader::new()) },
-                                       "content-title" => {Box::new(search::loaders::TitleLoader::new())},
-                                       "content-ext" => {Box::new(search::loaders::ExtLoader::new())},
-                                       _ =>  {Box::new(search::loaders::TitleLoader::new())}
-                                   });
-        }
-    }
-
-    content_loaders
-}
-
-
 impl ContentRun {
     fn default() -> ContentRun {
-        ContentRun { content_loader: String::from("--content-title"), scorers: vec![Box::new(search::scorers::Pass{})], targets: vec![String::from("")], insensitive: true }
+        ContentRun { content_loader: Box::new(search::loaders::ContentTitle::new()), scorers: vec![Box::new(search::scorers::Pass{})], targets: vec![String::from("")], insensitive: true }
     }
 
-    fn new(content_loader: String, insensitive: bool) -> ContentRun {
+    fn new(content_loader: Box<dyn search::loaders::ContentLoader>, insensitive: bool) -> ContentRun {
         ContentRun { content_loader: content_loader, scorers: vec![], targets: vec![], insensitive: insensitive }
     }
 
@@ -235,6 +219,7 @@ fn parse_args(args: std::slice::Iter<String>) -> Vec<Arg> {
         ('P', "content-path"),
         ('t', "content-text"),
         ('T', "content-title"),
+        ('E', "content-exec"),
         ('\0', "echo"),
         ('\0', "help"),
         ('a', "hidden"),
@@ -247,7 +232,8 @@ fn parse_args(args: std::slice::Iter<String>) -> Vec<Arg> {
         ('h', "has"),
         ('H', "hasnt"),
         ('e', "is"),
-        ('l', "less"),
+        ('L', "less"),
+        ('l', "long"),
         ('m', "more"),
         ('n', "not")
     ];
@@ -280,25 +266,34 @@ fn parse_args(args: std::slice::Iter<String>) -> Vec<Arg> {
 }
 
 fn get_content_runs(args: std::slice::Iter<Arg>, _matches: &clap::ArgMatches) -> Vec<ContentRun> {
-    let mut current_loader = "--content-title";
-    let mut current_run: ContentRun = ContentRun{content_loader: String::from(current_loader), scorers: Vec::new(), targets: Vec::new(), insensitive: true};
+    let mut current_loader: Box<dyn search::loaders::ContentLoader> = Box::new(search::loaders::ContentTitle::new());
+    let mut current_run: ContentRun = ContentRun{content_loader: current_loader, scorers: Vec::new(), targets: Vec::new(), insensitive: true};
     let mut content_runs: Vec<ContentRun> = Vec::new();
 
     let insensitive = false;
     for arg in args {
-        if arg.is("insensitive") {
-                current_run.insensitive = true;
-        }
-        else if arg.is("content-ext")
-            || arg.is("content-path")
-            || arg.is("content-text")
-            || arg.is("content-title") {
-            current_loader = &arg.long;
+        if let Some(loader) = search::loaders::parse(&arg.long) {
+            current_loader = loader;
+
             if current_run.is_valid() {
                 content_runs.push(current_run);
             }
 
-            current_run = ContentRun{content_loader: String::from(current_loader), scorers: Vec::new(), targets: Vec::new(), insensitive: insensitive};
+            current_run = ContentRun{content_loader: current_loader, scorers: Vec::new(), targets: Vec::new(), insensitive: insensitive};
+            continue;
+        }
+        else if arg.is("content-exec") {
+            current_loader = Box::new(search::loaders::ContentExec::new(&arg.get_value().unwrap()));
+
+            if current_run.is_valid() {
+                content_runs.push(current_run);
+            }
+
+            current_run = ContentRun{content_loader: current_loader, scorers: Vec::new(), targets: Vec::new(), insensitive: insensitive};
+            continue;
+        }
+        else if arg.is("insensitive") {
+                current_run.insensitive = true;
         }
         else if arg.is("is") {
             current_run.scorers.push(Box::new(search::scorers::Is{}));
@@ -342,7 +337,7 @@ fn summarize_runs(runs: std::slice::Iter<ContentRun>) {
     println!("Summarizing Operational Runs:");
     let mut count: u32 = 0;
     for run in runs {
-        println!("{} [insensitive={}]", run.content_loader, run.insensitive);
+        println!("{} [insensitive={}]", run.content_loader.get_name(), run.insensitive);
 
         for (scorer, target) in run.scorers.iter().zip(run.targets.iter()) {
             println!("\t{}({})", scorer.get_name(), target);
@@ -362,7 +357,8 @@ struct FileTraverseSpecs {
 
 struct OutputSpecs {
     absolute: bool,
-    score: bool 
+    score: bool,
+    long: bool
 }
 
 impl FileTraverseSpecs {
@@ -372,8 +368,8 @@ impl FileTraverseSpecs {
 }
 
 impl OutputSpecs {
-    fn new(absolute: bool, score: bool) -> OutputSpecs {
-        OutputSpecs{ absolute: absolute, score: score }
+    fn new(absolute: bool, score: bool, long: bool) -> OutputSpecs {
+        OutputSpecs{ absolute: absolute, score: score, long: long }
     }
 }
 
@@ -387,13 +383,13 @@ fn get_file_traverse_specs(matches: &clap::ArgMatches) -> FileTraverseSpecs {
 fn get_output_specs(matches: &clap::ArgMatches) -> OutputSpecs {
     let absolute = matches.is_present("absolute");
     let score = matches.is_present("score");
+    let long = matches.is_present("long");
 
-    return OutputSpecs::new(absolute, score);
+    return OutputSpecs::new(absolute, score, long);
 }
 
-fn get_content(run: &ContentRun, content_loaders: &HashMap<String, Box<dyn search::loaders::ContentLoader>>, direntry: &walkdir::DirEntry) -> String {
-    let content_loader = content_loaders.get(&run.content_loader).expect("Unable to get content loader");
-    let mut content = content_loader.load_content(&direntry);
+fn get_content(run: &ContentRun, direntry: &walkdir::DirEntry) -> String {
+    let mut content = run.content_loader.load_content(&direntry);
    
     if run.insensitive {
         content = content.to_ascii_lowercase();
@@ -410,8 +406,7 @@ pub fn process_command(path: &str, args: Vec<String>, matches: &clap::ArgMatches
 
     let traverse_specs = get_file_traverse_specs(matches);
     let output_specs = get_output_specs(matches);
-    let loader_names: Vec<String> = runs.iter().map(|r| String::from(&r.content_loader)).collect();
-    let content_loaders = get_content_loaders(loader_names.iter());
+    let loader_names: Vec<String> = runs.iter().map(|r| String::from(r.content_loader.get_name())).collect();
     //
     //optimize_content_run_order(&mut runs);
 
@@ -451,7 +446,7 @@ pub fn process_command(path: &str, args: Vec<String>, matches: &clap::ArgMatches
                 continue
             }
 
-            let content = get_content(&run, &content_loaders, &direntry);
+            let content = get_content(&run, &direntry);
             let mut filtered = true;
             let mut score = 0.0;
 
@@ -492,7 +487,7 @@ pub fn process_command(path: &str, args: Vec<String>, matches: &clap::ArgMatches
 }
 
 fn print_direntries(output_specs: OutputSpecs, path: &path::PathBuf, directories: Vec<(f32, walkdir::DirEntry)>) {
-    if output_specs.score {
+    if output_specs.long || output_specs.score{
         linear_print(output_specs, path, directories);
     }
     else {
@@ -554,6 +549,38 @@ impl PrintlnFormatter for ScoreFormatter {
     }
 }
 
+struct LongFormatter { }
+impl PrintlnFormatter for LongFormatter {
+    fn print(&self, score: &f32, path: &path::PathBuf, direntry: &walkdir::DirEntry, output_specs: &OutputSpecs) {
+        let meta = direntry.metadata().expect("Unable to retrieve metadata");
+        let mode = meta.mode();
+        let mut permission_str = String::new();
+
+        permission_str += if meta.is_dir() { "d" } else { "-" };
+
+        for i in 0..9 {
+            let bit = mode.get_bit(i);
+            if i % 3 == 0 {
+                permission_str += if bit { "-" } else { "r" };
+            }
+            else if (i + 1) % 3 == 0 {
+                permission_str += if bit { "-" } else { "x" };
+            }
+            else if (i + 2) % 3 == 0 {
+                permission_str += if bit { "-" } else { "w" };
+            }
+        }
+
+        let dir_path = if output_specs.absolute { path_abs(&direntry) } else { path_rel(&direntry, path) };
+        let timestamp = meta.modified().expect("Unable to retrieve modfied").duration_since(UNIX_EPOCH).expect("Uh oh").as_secs();
+        let modified = "Aug 3. 1997"; //datetime.format("%Y %m");
+        let owner = meta.uid();
+        let group = meta.gid();
+
+        println!("{} {} {} {} {}", permission_str, owner, group, modified, dir_path);
+    }
+}
+
 struct StdFormatter { }
 impl PrintlnFormatter for StdFormatter {
     fn print(&self, score: &f32, path: &path::PathBuf, direntry: &walkdir::DirEntry, output_specs: &OutputSpecs) {
@@ -573,7 +600,8 @@ fn linear_print(output_specs: OutputSpecs, path: &path::PathBuf, directories: Ve
             Box::new(ScoreFormatter {})
         }
         else {
-            Box::new(StdFormatter {})
+            //Box::new(StdFormatter {})
+            Box::new(LongFormatter {})
         };
 
         for (score, direntry) in directories {

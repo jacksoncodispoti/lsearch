@@ -41,7 +41,7 @@ args:
                 takes_value: true
                 about: Increase based on matches
         - less:
-                short: l
+                short: L
                 long: less
                 multiple: true
                 takes_value: true
@@ -56,6 +56,11 @@ args:
                 about: Don't match case
 
         #Output
+        - long:
+                short: l
+                long: long
+                takes_value: false
+                about: Long listing
         - score:
                 long: score
                 takes_value: false
@@ -89,6 +94,11 @@ args:
                 multiple: true
                 takes_value: false
                 about: File title
+        - content-exec:
+                short: C
+                long: content-exec
+                takes_value: true
+                about: Result as content of `passed_command <content-path>`
         - content-path:
                 short: P
                 long: content-path
