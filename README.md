@@ -52,12 +52,27 @@ There are several types of content. Listed are some below:
 |Content Type|Content|
 |---|---|
 |--content-path, -P|/home/jackson/testfile.txt|
-|--content-title, -T|testfile|
+|--content-title, -T|testfile.txt|
 |--content-ext, -E|txt|
 |--content-text, -t|Hello there!|
+|--content-exec <command>|Result of `command content-title` is content|
 |--context-exif|[planned]|
-|--content-exec|[planned]|
 
+## Using Content-exec
+You may be thinking to yourself "Oh yay, I can search by file contents and path, but what about something like the owner?" That's a case content-exec addresses!
+```
+# List all files where owner is jackson
+lsearch -C "stat --printf=%U" --is alerik
+```
+In the above command `-C` is an abreviation of `--content-exec`. We pass the command `stat --printf=%U"` command as the argument. Then, for a file `query-file` in a query, is runs `start --printf=%U $query-file` and returns the file user.
+
+Or, we could do something else and filter our query by file permissions:
+```
+# List all files where permissions are like 7xx x7x xx7
+lsearch -C "stat --printf=7" --has 7
+```
+Similarly, in the above command `%a` denotes file permissions to `stat`.
+This should prove a powerful search tool in conjunction with other system programs
 ## Content Scorers
 Below are the content scorers in lsearch:
 
