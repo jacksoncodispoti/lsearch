@@ -219,7 +219,7 @@ fn parse_args(args: std::slice::Iter<String>) -> Vec<Arg> {
         ('P', "content-path"),
         ('t', "content-text"),
         ('T', "content-title"),
-        ('E', "content-exec"),
+        ('C', "content-exec"),
         ('\0', "echo"),
         ('\0', "help"),
         ('a', "hidden"),

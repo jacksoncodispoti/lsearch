@@ -29,7 +29,7 @@ pub mod loaders {
     impl ContentLoader for ContentTitle {
         fn load_content(&self, entry: &walkdir::DirEntry) -> String {
             String::from(match entry.file_name().to_str() {
-                Some(file_name) => {println!("{}", file_name);file_name},
+                Some(file_name) => {file_name},
                 None => { "" }
             })
         }

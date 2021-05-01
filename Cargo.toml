@@ -10,3 +10,5 @@ edition = "2018"
 clap = { version = "3.0.0-beta.2", features = ["yaml"] }
 walkdir = "2"
 colour = "0.5.0"
+bit_field = "0.9.0"
+chrono = "0.4.19"
