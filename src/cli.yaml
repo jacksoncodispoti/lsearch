@@ -6,6 +6,7 @@ args:
         - path:
                 takes_value: true
                 value_name: PATH
+                multiple: true
                 about: The path to look in
         #Filters
         - is:

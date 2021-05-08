@@ -3,9 +3,29 @@ pub mod loaders {
     use std::io::prelude::*;
     use std::io::BufReader;
     use std::process::Command;
+    use std::path::Path;
+
+    #[derive(Debug)]
+    pub struct FileData<'a> {
+        path: &'a Path,
+    }
+
+    impl FileData<'_> {
+        pub fn new(path: &std::path::Path) -> FileData {
+            FileData { path }
+        }
+
+        pub fn path(&self) -> &Path {
+            self.path
+        }
+
+        pub fn metadata(&self) -> std::fs::Metadata {
+            self.path.metadata().expect("Unable to get metadata")
+        }
+    }
 
     pub trait ContentLoader {
-        fn load_content(&self, entry: &walkdir::DirEntry) -> String;
+        fn load_content(&self, entry: &FileData) -> String;
         fn get_name(&self) -> &str;
     }
 
@@ -27,8 +47,8 @@ pub mod loaders {
         }
     }
     impl ContentLoader for ContentTitle {
-        fn load_content(&self, entry: &walkdir::DirEntry) -> String {
-            String::from(match entry.file_name().to_str() {
+        fn load_content(&self, entry: &FileData) -> String {
+            String::from(match entry.path.file_name().unwrap().to_str() {
                 Some(file_name) => {file_name},
                 None => { "" }
             })
@@ -47,8 +67,8 @@ pub mod loaders {
         }
     }
     impl ContentLoader for ContentPath {
-        fn load_content(&self, entry: &walkdir::DirEntry) -> String {
-            String::from(entry.path().to_str().unwrap())
+        fn load_content(&self, entry: &FileData) -> String {
+            String::from(entry.path.to_str().unwrap())
         }
 
         fn get_name(&self) -> &str {
@@ -64,8 +84,8 @@ pub mod loaders {
         }
     }
     impl ContentLoader for ContentExt {
-        fn load_content(&self, entry: &walkdir::DirEntry) -> String {
-            match entry.path().extension() {
+        fn load_content(&self, entry: &FileData) -> String {
+            match entry.path.extension() {
                 Some(ext) => { return String::from(ext.to_str().unwrap());}
                 None => { return String::from(""); }
             }
@@ -84,13 +104,13 @@ pub mod loaders {
         }
     }
     impl ContentLoader for ContentText {
-        fn load_content(&self, entry: &walkdir::DirEntry) -> String {
-            if entry.path().is_dir() {
+        fn load_content(&self, entry: &FileData) -> String {
+            if entry.path.is_dir() {
                 return String::new();
             }
             else{
                 let mut contents = String::new();
-                let file = File::open(String::from(entry.path().to_str().unwrap())).unwrap();
+                let file = File::open(String::from(entry.path.to_str().unwrap())).unwrap();
                 let mut buf_reader = BufReader::new(file);
                 buf_reader.read_to_string(&mut contents).expect("Failed to read contents");
                 contents
@@ -111,14 +131,14 @@ pub mod loaders {
         }
     }
     impl ContentLoader for ContentExec {
-        fn load_content(&self, entry: &walkdir::DirEntry) -> String {
+        fn load_content(&self, entry: &FileData) -> String {
             let mut i = self.command.split(' ');
             let mut cmd = Command::new(i.next().unwrap());
             while let Some(arg) = i.next() {
                 cmd.arg(arg); 
             }
             
-            if let Some(file_name) = entry.file_name().to_str() {
+            if let Some(file_name) = entry.path.file_name().unwrap().to_str() {
                 cmd.arg(file_name);
                 String::from_utf8(cmd.output().expect("Failed to run process").stdout).expect("Unable to parse output")
             }

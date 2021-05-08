@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use crate::search;
 use walkdir::WalkDir;
 use search::scorers::fs::{DirEntryFilter, HiddenFilter};
@@ -8,10 +7,8 @@ use std::io::Write;
 use colour;
 use std::os::unix::fs::MetadataExt;
 use bit_field::BitField;
-use std::time::{SystemTime, UNIX_EPOCH};
-use chrono::naive::NaiveDateTime;
-use chrono::DateTime;
-
+use std::time::UNIX_EPOCH;
+use search::loaders::FileData;
 
 mod stats {
     use std::collections::HashMap;
@@ -236,23 +233,23 @@ fn parse_args(args: std::slice::Iter<String>) -> Vec<Arg> {
         ('l', "long"),
         ('m', "more"),
         ('n', "not")
-    ];
+            ];
 
     let mut parsed_args: Vec<Arg> = vec![];
 
     for arg in args {
         if arg.starts_with("--") {
-           let arg = arg_lookup.iter().find(|a|a.1==&arg[2..]).unwrap();
-           parsed_args.push(Arg::new(arg.0, arg.1));
+            let arg = arg_lookup.iter().find(|a|a.1==&arg[2..]).unwrap();
+            parsed_args.push(Arg::new(arg.0, arg.1));
         }
         else if arg.starts_with("-") {
-           let split: Vec<char> = arg.as_bytes().iter().skip(1)
-               .map(|b| *b as char).collect();
+            let split: Vec<char> = arg.as_bytes().iter().skip(1)
+                .map(|b| *b as char).collect();
 
-           for sub_arg in split {
-               let arg = arg_lookup.iter().find(|a|a.0==sub_arg).unwrap();
-               parsed_args.push(Arg::new(arg.0, arg.1));
-           }
+            for sub_arg in split {
+                let arg = arg_lookup.iter().find(|a|a.0==sub_arg).unwrap();
+                parsed_args.push(Arg::new(arg.0, arg.1));
+            }
         }
         else {
             match parsed_args.last_mut() {
@@ -293,7 +290,7 @@ fn get_content_runs(args: std::slice::Iter<Arg>, _matches: &clap::ArgMatches) ->
             continue;
         }
         else if arg.is("insensitive") {
-                current_run.insensitive = true;
+            current_run.insensitive = true;
         }
         else if arg.is("is") {
             current_run.scorers.push(Box::new(search::scorers::Is{}));
@@ -388,14 +385,37 @@ fn get_output_specs(matches: &clap::ArgMatches) -> OutputSpecs {
     return OutputSpecs::new(absolute, score, long);
 }
 
-fn get_content(run: &ContentRun, direntry: &walkdir::DirEntry) -> String {
-    let mut content = run.content_loader.load_content(&direntry);
-   
+fn get_content(run: &ContentRun, filedata: &search::loaders::FileData) -> String {
+    let mut content = run.content_loader.load_content(&filedata);
+
     if run.insensitive {
         content = content.to_ascii_lowercase();
     }
 
     content
+}
+
+fn runScorer (run: &ContentRun, run_stats: &mut stats::RunStats, content: String) -> (bool, f32) {
+    let mut filtered = true;
+    let mut score = 0.0;
+
+    for (scorer, target) in run.scorers.iter().zip(run.targets.iter()) {
+        let operation_key = search::scorers::create_key_from_scorer(&scorer, &target);
+        let target = if run.insensitive { target.to_ascii_lowercase() } else { String::from(target) };
+
+        run_stats.start_operation(&operation_key, content.len());
+        let ind_score = scorer.score(&content, &target);
+        run_stats.stop_operation(&operation_key);
+
+        score += ind_score; 
+
+        if ind_score < 1.0 {
+            filtered = false;
+            break;
+        }
+    }
+
+    (filtered, score)
 }
 
 pub fn process_command(path: &str, args: Vec<String>, matches: &clap::ArgMatches) -> u32 {
@@ -406,8 +426,7 @@ pub fn process_command(path: &str, args: Vec<String>, matches: &clap::ArgMatches
 
     let traverse_specs = get_file_traverse_specs(matches);
     let output_specs = get_output_specs(matches);
-    let loader_names: Vec<String> = runs.iter().map(|r| String::from(r.content_loader.get_name())).collect();
-    //
+    
     //optimize_content_run_order(&mut runs);
 
     let mut app_stats = stats::AppStats::new();
@@ -430,46 +449,47 @@ pub fn process_command(path: &str, args: Vec<String>, matches: &clap::ArgMatches
         false => WalkDir::new(&path).max_depth(1)
     }
     .sort_by(|a,b| b.file_name().cmp(a.file_name()));
-    let mut directories: Vec<(f32, walkdir::DirEntry)> = directories.into_iter()
+    let directories: Vec<walkdir::DirEntry> = directories.into_iter()
         .filter_map(|e| e.ok())
-        .map(|a|(1.0, a))
+        .filter(|e| hidden_filter.filter(e))
         .collect();
 
-    let mut next_directories: Vec<(f32, walkdir::DirEntry)>;
+    let mut directories: Vec<(f32, FileData)> = directories.iter()
+        .map(|e| (0.0, FileData::new(e.path())))
+        .collect();
+
+    let mut next_directories: Vec<(f32, FileData)>;
 
     for run in runs {
         let mut run_stats = stats::RunStats::new(&run);
         next_directories = Vec::new();
 
-        for (_s, direntry) in directories.into_iter() {
-            if !hidden_filter.filter(&direntry) {
-                continue
-            }
+        if directories.len() == 0 {
+            let path = std::path::Path::new(path.to_str().unwrap());
+            let filedata = search::loaders::FileData::new(path);
+            let content = get_content(&run, &filedata);
+            let (filtered, score) = runScorer(&run, &mut run_stats, content);
 
-            let content = get_content(&run, &direntry);
-            let mut filtered = true;
-            let mut score = 0.0;
-
-            for (scorer, target) in run.scorers.iter().zip(run.targets.iter()) {
-                let operation_key = search::scorers::create_key_from_scorer(&scorer, &target);
-                let target = if run.insensitive { target.to_ascii_lowercase() } else { String::from(target) };
-
-                run_stats.start_operation(&operation_key, content.len());
-                let ind_score = scorer.score(&content, &target);
-                run_stats.stop_operation(&operation_key);
-
-                score += ind_score; 
-
-                if ind_score < 1.0 {
-                    filtered = false;
-                    break;
-                }
-            }
-
+            println!("No directories, need to run {}", path.to_str().unwrap());
             if filtered {
-                next_directories.push((score, direntry));
+                next_directories.push((score, filedata));
             }
         }
+
+        for (_s, filedata) in directories.into_iter() {
+            //if !hidden_filter.filter(&filedata) {
+            //    continue
+            //}
+
+            let content = get_content(&run, &filedata);
+
+            let (filtered, score) = runScorer(&run, &mut run_stats, content);
+
+            if filtered {
+                next_directories.push((score, filedata));
+            }
+        }
+
 
         next_directories.sort_by(|a,b| a.0.partial_cmp(&b.0).unwrap());
         next_directories.reverse();
@@ -477,16 +497,17 @@ pub fn process_command(path: &str, args: Vec<String>, matches: &clap::ArgMatches
         directories = next_directories;
         app_stats.push_run(run_stats);
     }
-    
+
     print_direntries(output_specs, &path, directories);
 
     if matches.is_present("stats") {
         print!("{}", app_stats);
     }
+
     0
 }
 
-fn print_direntries(output_specs: OutputSpecs, path: &path::PathBuf, directories: Vec<(f32, walkdir::DirEntry)>) {
+fn print_direntries(output_specs: OutputSpecs, path: &path::PathBuf, directories: Vec<(f32, FileData)>) {
     if output_specs.long || output_specs.score{
         linear_print(output_specs, path, directories);
     }
@@ -495,22 +516,26 @@ fn print_direntries(output_specs: OutputSpecs, path: &path::PathBuf, directories
     }
 }
 
-fn path_abs(direntry: &walkdir::DirEntry) -> &str {
+fn path_abs<'a>(direntry: &'a FileData) -> &'a str {
     direntry.path().as_os_str().to_str().unwrap()
 }
-fn path_rel<'a>(direntry: &'a walkdir::DirEntry, path: &'a path::PathBuf) -> &'a str {
-    let dir_path = direntry.path().as_os_str().to_str().unwrap();
-    match dir_path.strip_prefix(path.as_path().as_os_str().to_str().unwrap()) {
+fn path_rel<'a>(direntry: &'a FileData, path: &'a path::PathBuf) -> &'a str {
+    let dir_path = direntry.path().to_str().unwrap();
+    let str_path = path.to_str().unwrap();
+
+    if dir_path == str_path {
+        return path.file_name().unwrap().to_str().unwrap();
+    }
+    match dir_path.strip_prefix(str_path) {
         Some(str) => if str.len() > 0 { &str[1..] } else { "" },
         None => ""
     }
 }
 
-fn print_dir<'a>(direntry: &'a walkdir::DirEntry, path: &'a path::PathBuf, absolute: bool) -> &'a str {
+fn print_dir<'a>(direntry: &'a FileData, path: &'a path::PathBuf, absolute: bool) -> &'a str {
     if absolute {
         let dir_path = path_abs(&direntry);
 
-        println!("{}", dir_path);
         if direntry.path().is_dir() {
             colour::green!("{}", dir_path);
         }
@@ -532,12 +557,12 @@ fn print_dir<'a>(direntry: &'a walkdir::DirEntry, path: &'a path::PathBuf, absol
 }
 
 trait PrintlnFormatter {
-    fn print(&self, score: &f32, path: &path::PathBuf, direntry: &walkdir::DirEntry, output_specs: &OutputSpecs);
+    fn print(&self, score: &f32, path: &path::PathBuf, direntry: &FileData, output_specs: &OutputSpecs);
 }
 
 struct ScoreFormatter { }
 impl PrintlnFormatter for ScoreFormatter {
-    fn print(&self, score: &f32, path: &path::PathBuf, direntry: &walkdir::DirEntry, output_specs: &OutputSpecs) {
+    fn print(&self, score: &f32, path: &path::PathBuf, direntry: &FileData, output_specs: &OutputSpecs) {
         if output_specs.absolute {
             let dir_path = path_abs(&direntry);
             println!("[{}]{}", score, dir_path);
@@ -551,8 +576,8 @@ impl PrintlnFormatter for ScoreFormatter {
 
 struct LongFormatter { }
 impl PrintlnFormatter for LongFormatter {
-    fn print(&self, score: &f32, path: &path::PathBuf, direntry: &walkdir::DirEntry, output_specs: &OutputSpecs) {
-        let meta = direntry.metadata().expect("Unable to retrieve metadata");
+    fn print(&self, score: &f32, path: &path::PathBuf, direntry: &FileData, output_specs: &OutputSpecs) {
+        let meta = direntry.metadata();
         let mode = meta.mode();
         let mut permission_str = String::new();
 
@@ -572,7 +597,7 @@ impl PrintlnFormatter for LongFormatter {
         }
 
         let dir_path = if output_specs.absolute { path_abs(&direntry) } else { path_rel(&direntry, path) };
-        let timestamp = meta.modified().expect("Unable to retrieve modfied").duration_since(UNIX_EPOCH).expect("Uh oh").as_secs();
+        //let timestamp = meta.modified().expect("Unable to retrieve modfied").duration_since(UNIX_EPOCH).expect("Uh oh").as_secs();
         let modified = "Aug 3. 1997"; //datetime.format("%Y %m");
         let owner = meta.uid();
         let group = meta.gid();
@@ -583,7 +608,7 @@ impl PrintlnFormatter for LongFormatter {
 
 struct StdFormatter { }
 impl PrintlnFormatter for StdFormatter {
-    fn print(&self, score: &f32, path: &path::PathBuf, direntry: &walkdir::DirEntry, output_specs: &OutputSpecs) {
+    fn print(&self, score: &f32, path: &path::PathBuf, direntry: &FileData, output_specs: &OutputSpecs) {
         if output_specs.absolute {
             let dir_path = path_abs(&direntry);
             println!("{}",  dir_path);
@@ -595,22 +620,23 @@ impl PrintlnFormatter for StdFormatter {
     }
 }
 
-fn linear_print(output_specs: OutputSpecs, path: &path::PathBuf, directories: Vec<(f32, walkdir::DirEntry)>) {
+fn linear_print(output_specs: OutputSpecs, path: &path::PathBuf, directories: Vec<(f32, FileData)>) {
     let formatter: Box<dyn PrintlnFormatter> = if output_specs.score {
-            Box::new(ScoreFormatter {})
-        }
-        else {
-            //Box::new(StdFormatter {})
-            Box::new(LongFormatter {})
-        };
+        Box::new(ScoreFormatter {})
+    }
+    else {
+        //Box::new(StdFormatter {})
+        Box::new(LongFormatter {})
+    };
 
-        for (score, direntry) in directories {
-            formatter.print(&score, path, &direntry, &output_specs);
-        }
+    for (score, direntry) in directories {
+        formatter.print(&score, path, &direntry, &output_specs);
+    }
 }
 
-fn grid_print(output_specs: OutputSpecs, path: &path::PathBuf, directories: Vec<(f32, walkdir::DirEntry)>) {
+fn grid_print(output_specs: OutputSpecs, path: &path::PathBuf, directories: Vec<(f32, FileData)>) {
     const MAX_LINE: u32 = 80;
+
     if directories.len() == 0 {
         return;
     }
@@ -619,11 +645,10 @@ fn grid_print(output_specs: OutputSpecs, path: &path::PathBuf, directories: Vec<
         .map(|x| if output_specs.absolute { path_abs(&x.1) } else { path_rel(&x.1, path) }.len())
         .max()
         .unwrap() as u32 + 5;
-    
-    let columns = MAX_LINE / max_width;
-    
-    let mut x = 0;
 
+    let columns = MAX_LINE / max_width;
+
+    let mut x = 0;
     for (_score, direntry) in directories {
         if x > columns {
             x = 0;
