@@ -503,6 +503,9 @@ pub fn process_command(path: &str, args: std::slice::Iter<String>, matches: &cla
     0
 }
 
+use users::{get_user_by_uid, get_group_by_gid};
+use chrono::prelude::*;
+
 fn print_direntries(output_specs: OutputSpecs, path: &path::PathBuf, directories: Vec<(f32, FileData)>) {
     if output_specs.long || output_specs.score{
         linear_print(output_specs, path, directories);
@@ -593,12 +596,16 @@ impl PrintlnFormatter for LongFormatter {
         }
 
         let dir_path = if output_specs.absolute { path_abs(&direntry) } else { path_rel(&direntry, path) };
-        //let timestamp = meta.modified().expect("Unable to retrieve modfied").duration_since(UNIX_EPOCH).expect("Uh oh").as_secs();
-        let modified = "Aug 3. 1997"; //datetime.format("%Y %m");
-        let owner = meta.uid();
-        let group = meta.gid();
+        let timestamp = meta.modified().expect("Unable to retrieve modfied").duration_since(UNIX_EPOCH).expect("Uh oh").as_secs();
+        let modified = Utc.timestamp(timestamp as i64, 0);
+        let modified: DateTime<Local> = DateTime::with_timezone(&modified, &Local);
+        let owner = get_user_by_uid(meta.uid()).unwrap();
+        let owner_name = owner.name().to_str().unwrap();
+        
+        let group = get_group_by_gid(meta.gid()).unwrap();
+        let group_name = group.name().to_str().unwrap();
 
-        println!("{} {} {} {} {}", permission_str, owner, group, modified, dir_path);
+        println!("{} {} {} {} {}", permission_str, owner_name, group_name, modified.format("%b %d %H:%M"), dir_path);
     }
 }
 
