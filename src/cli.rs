@@ -418,9 +418,9 @@ fn runScorer (run: &ContentRun, run_stats: &mut stats::RunStats, content: String
     (filtered, score)
 }
 
-pub fn process_command(path: &str, args: Vec<String>, matches: &clap::ArgMatches) -> u32 {
+pub fn process_command(path: &str, args: std::slice::Iter<String>, matches: &clap::ArgMatches) -> u32 {
     let mut path = path::PathBuf::from(path);
-    let args = parse_args(args.iter());
+    let args = parse_args(args);
     //let command_order = process_command_order(args);
     let runs = get_content_runs(args.iter(), matches);
 
@@ -477,10 +477,6 @@ pub fn process_command(path: &str, args: Vec<String>, matches: &clap::ArgMatches
         }
 
         for (_s, filedata) in directories.into_iter() {
-            //if !hidden_filter.filter(&filedata) {
-            //    continue
-            //}
-
             let content = get_content(&run, &filedata);
 
             let (filtered, score) = runScorer(&run, &mut run_stats, content);
@@ -653,7 +649,6 @@ fn grid_print(output_specs: OutputSpecs, path: &path::PathBuf, directories: Vec<
         if x > columns {
             x = 0;
             colour::white_ln!("");
-            //println!();
         }
 
         if output_specs.absolute {

@@ -9,11 +9,15 @@ fn main() {
     let matches = clap::App::from(yaml).get_matches();
         
     let result: Vec<String> = env::args().collect();
-    let path = matches.value_of("path");
-    let path =  match path{
-        Some(path) => {path},
-        None => {"./"}
-    };
+    let paths = matches.values_of("path");
 
-    cli::process_command(path, result, &matches);
+    if let Some(paths) = paths{
+        for path in paths {
+            cli::process_command(path, result.iter(), &matches);
+        }
+    }
+    else {
+        cli::process_command("./", result.iter(), &matches);
+    }
+    println!();
 }
