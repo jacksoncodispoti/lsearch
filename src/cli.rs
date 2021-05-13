@@ -447,20 +447,13 @@ pub fn process_command(pattern: &str, args: std::slice::Iter<String>, matches: &
         summarize_runs(runs.iter());
     }
 
-    //let directories = match traverse_specs.recursive {
-    //    true => WalkDir::new(&pattern),
-    //    false => WalkDir::new(&pattern).max_depth(1)
-    //}
-    //.sort_by(|a,b| b.file_name().cmp(a.file_name()));
-
     let directories = match traverse_specs.recursive {
-        true => glob(pattern),
+        true => glob(&("**/".to_owned() + pattern)),
         false => glob(pattern)
     }
     .expect("Failed to glob")
     .into_iter()
     .collect::<Vec<Result<path::PathBuf, glob::GlobError>>>();
-    //.sort_by(|a,b| b.file_name().cmp(a.file_name()));
 
     let directories: Vec<path::PathBuf> = directories.into_iter()
         .filter_map(|e| e.ok())
