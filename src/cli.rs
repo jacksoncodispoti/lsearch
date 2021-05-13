@@ -418,8 +418,14 @@ fn runScorer (run: &ContentRun, run_stats: &mut stats::RunStats, content: String
     (filtered, score)
 }
 
-pub fn process_command(path: &str, args: std::slice::Iter<String>, matches: &clap::ArgMatches) -> u32 {
-    let mut path = path::PathBuf::from(path);
+use glob::glob;
+
+fn is_hidden(path: &path::PathBuf) -> bool {
+    false
+}
+
+pub fn process_command(pattern: &str, args: std::slice::Iter<String>, matches: &clap::ArgMatches) -> u32 {
+    //let mut pattern = path::PathBuf::from(pattern);
     let args = parse_args(args);
     //let command_order = process_command_order(args);
     let runs = get_content_runs(args.iter(), matches);
@@ -430,32 +436,40 @@ pub fn process_command(path: &str, args: std::slice::Iter<String>, matches: &cla
     //optimize_content_run_order(&mut runs);
 
     let mut app_stats = stats::AppStats::new();
-    //let mut content_run_stats: Vec<stats::RunStats> = Vec::new();
 
-    path = fs::canonicalize(&path).unwrap();
+    //pattern = fs::canonicalize(&pattern).unwrap();
     if matches.is_present("echo") {
-        println!("\tls {:?}", path);
-        println!("\tls {:?}", path);
+        println!("\tls {:?}", pattern);
+        println!("\tls {:?}", pattern);
     }
 
     if matches.is_present("strats") {
         summarize_runs(runs.iter());
     }
 
-    let hidden_filter = HiddenFilter::new(traverse_specs.hidden);
+    //let directories = match traverse_specs.recursive {
+    //    true => WalkDir::new(&pattern),
+    //    false => WalkDir::new(&pattern).max_depth(1)
+    //}
+    //.sort_by(|a,b| b.file_name().cmp(a.file_name()));
 
     let directories = match traverse_specs.recursive {
-        true => WalkDir::new(&path),
-        false => WalkDir::new(&path).max_depth(1)
+        true => glob(pattern),
+        false => glob(pattern)
     }
-    .sort_by(|a,b| b.file_name().cmp(a.file_name()));
-    let directories: Vec<walkdir::DirEntry> = directories.into_iter()
+    .expect("Failed to glob")
+    .into_iter()
+    .collect::<Vec<Result<path::PathBuf, glob::GlobError>>>();
+    //.sort_by(|a,b| b.file_name().cmp(a.file_name()));
+
+    let directories: Vec<path::PathBuf> = directories.into_iter()
         .filter_map(|e| e.ok())
-        .filter(|e| hidden_filter.filter(e))
+        .filter(|e| !is_hidden(e) || traverse_specs.hidden)
+        .map(|e| e.canonicalize().expect("Unable to canonicalize"))
         .collect();
 
-    let mut directories: Vec<(f32, FileData)> = directories.iter()
-        .map(|e| (0.0, FileData::new(e.path())))
+    let mut directories: Vec<(f32, FileData)> = directories.into_iter()
+        .map(|e| (0.0, FileData::new(e)))
         .collect();
 
     let mut next_directories: Vec<(f32, FileData)>;
@@ -465,14 +479,17 @@ pub fn process_command(path: &str, args: std::slice::Iter<String>, matches: &cla
         next_directories = Vec::new();
 
         if directories.len() == 0 {
-            let path = std::path::Path::new(path.to_str().unwrap());
-            let filedata = search::loaders::FileData::new(path);
-            let content = get_content(&run, &filedata);
-            let (filtered, score) = runScorer(&run, &mut run_stats, content);
+            if let Ok(path) = std::path::Path::new(pattern).canonicalize() {
+                let filedata = search::loaders::FileData::new(path);
+                let content = get_content(&run, &filedata);
+                let (filtered, score) = runScorer(&run, &mut run_stats, content);
 
-            println!("No directories, need to run {}", path.to_str().unwrap());
-            if filtered {
-                next_directories.push((score, filedata));
+                if filtered {
+                    next_directories.push((score, filedata));
+                }
+            }
+            else {
+                print!("no matches found: {}", pattern);
             }
         }
 
@@ -494,7 +511,13 @@ pub fn process_command(path: &str, args: std::slice::Iter<String>, matches: &cla
         app_stats.push_run(run_stats);
     }
 
-    print_direntries(output_specs, &path, directories);
+    let parent = match path::Path::new(&pattern).canonicalize() {
+        Ok(str_path) => str_path,
+        Err(..) => path::Path::new("./").canonicalize().expect("Unable to get local directory")
+    };
+    let parent = parent.to_str().unwrap();
+
+    print_direntries(output_specs, &parent, directories);
 
     if matches.is_present("stats") {
         print!("{}", app_stats);
@@ -506,32 +529,32 @@ pub fn process_command(path: &str, args: std::slice::Iter<String>, matches: &cla
 use users::{get_user_by_uid, get_group_by_gid};
 use chrono::prelude::*;
 
-fn print_direntries(output_specs: OutputSpecs, path: &path::PathBuf, directories: Vec<(f32, FileData)>) {
+fn print_direntries(output_specs: OutputSpecs, parent: &str, directories: Vec<(f32, FileData)>) {
     if output_specs.long || output_specs.score{
-        linear_print(output_specs, path, directories);
+        linear_print(output_specs, parent, directories);
     }
     else {
-        grid_print(output_specs, path, directories);
+        grid_print(output_specs, parent, directories);
     }
 }
 
 fn path_abs<'a>(direntry: &'a FileData) -> &'a str {
     direntry.path().as_os_str().to_str().unwrap()
 }
-fn path_rel<'a>(direntry: &'a FileData, path: &'a path::PathBuf) -> &'a str {
+fn path_rel<'a>(direntry: &'a FileData, parent: &'a str) -> &'a str {
     let dir_path = direntry.path().to_str().unwrap();
-    let str_path = path.to_str().unwrap();
-
-    if dir_path == str_path {
-        return path.file_name().unwrap().to_str().unwrap();
+    
+    if dir_path == parent {
+        return "";
+        //TODO: return parent.file_name().unwrap().to_str().unwrap();
     }
-    match dir_path.strip_prefix(str_path) {
+    match dir_path.strip_prefix(parent) {
         Some(str) => if str.len() > 0 { &str[1..] } else { "" },
-        None => ""
+        None => dir_path 
     }
 }
 
-fn print_dir<'a>(direntry: &'a FileData, path: &'a path::PathBuf, absolute: bool) -> &'a str {
+fn print_dir<'a>(direntry: &'a FileData, parent: &'a str, absolute: bool) -> &'a str {
     if absolute {
         let dir_path = path_abs(&direntry);
 
@@ -544,7 +567,7 @@ fn print_dir<'a>(direntry: &'a FileData, path: &'a path::PathBuf, absolute: bool
         dir_path
     }
     else {
-        let dir_path = path_rel(&direntry, path);
+        let dir_path = path_rel(&direntry, parent);
         if direntry.path().is_dir() {
             colour::green!("{}", dir_path);
         }
@@ -556,18 +579,18 @@ fn print_dir<'a>(direntry: &'a FileData, path: &'a path::PathBuf, absolute: bool
 }
 
 trait PrintlnFormatter {
-    fn print(&self, score: &f32, path: &path::PathBuf, direntry: &FileData, output_specs: &OutputSpecs);
+    fn print(&self, score: &f32, parent: &str, direntry: &FileData, output_specs: &OutputSpecs);
 }
 
 struct ScoreFormatter { }
 impl PrintlnFormatter for ScoreFormatter {
-    fn print(&self, score: &f32, path: &path::PathBuf, direntry: &FileData, output_specs: &OutputSpecs) {
+    fn print(&self, score: &f32, parent: &str, direntry: &FileData, output_specs: &OutputSpecs) {
         if output_specs.absolute {
             let dir_path = path_abs(&direntry);
             println!("[{}]{}", score, dir_path);
         }
         else {
-            let clean_path = path_rel(&direntry, path); 
+            let clean_path = path_rel(&direntry, parent); 
             println!("[{}] {}", score, clean_path);
         }
     }
@@ -575,7 +598,7 @@ impl PrintlnFormatter for ScoreFormatter {
 
 struct LongFormatter { }
 impl PrintlnFormatter for LongFormatter {
-    fn print(&self, score: &f32, path: &path::PathBuf, direntry: &FileData, output_specs: &OutputSpecs) {
+    fn print(&self, score: &f32, parent: &str, direntry: &FileData, output_specs: &OutputSpecs) {
         let meta = direntry.metadata();
         let mode = meta.mode();
         let mut permission_str = String::new();
@@ -591,11 +614,11 @@ impl PrintlnFormatter for LongFormatter {
                 permission_str += if bit { "-" } else { "x" };
             }
             else if (i + 2) % 3 == 0 {
-                permission_str += if bit { "-" } else { "w" };
+                permission_str += if bit { "w" } else { "-" };
             }
         }
 
-        let dir_path = if output_specs.absolute { path_abs(&direntry) } else { path_rel(&direntry, path) };
+        let dir_path = if output_specs.absolute { path_abs(&direntry) } else { path_rel(&direntry, parent) };
         let timestamp = meta.modified().expect("Unable to retrieve modfied").duration_since(UNIX_EPOCH).expect("Uh oh").as_secs();
         let modified = Utc.timestamp(timestamp as i64, 0);
         let modified: DateTime<Local> = DateTime::with_timezone(&modified, &Local);
@@ -611,19 +634,19 @@ impl PrintlnFormatter for LongFormatter {
 
 struct StdFormatter { }
 impl PrintlnFormatter for StdFormatter {
-    fn print(&self, score: &f32, path: &path::PathBuf, direntry: &FileData, output_specs: &OutputSpecs) {
+    fn print(&self, score: &f32, parent: &str, direntry: &FileData, output_specs: &OutputSpecs) {
         if output_specs.absolute {
             let dir_path = path_abs(&direntry);
             println!("{}",  dir_path);
         }
         else {
-            let clean_path = path_rel(&direntry, path); 
+            let clean_path = path_rel(&direntry, parent); 
             println!("{}", clean_path);
         }
     }
 }
 
-fn linear_print(output_specs: OutputSpecs, path: &path::PathBuf, directories: Vec<(f32, FileData)>) {
+fn linear_print(output_specs: OutputSpecs, parent: &str, directories: Vec<(f32, FileData)>) {
     let formatter: Box<dyn PrintlnFormatter> = if output_specs.score {
         Box::new(ScoreFormatter {})
     }
@@ -633,11 +656,11 @@ fn linear_print(output_specs: OutputSpecs, path: &path::PathBuf, directories: Ve
     };
 
     for (score, direntry) in directories {
-        formatter.print(&score, path, &direntry, &output_specs);
+        formatter.print(&score, parent, &direntry, &output_specs);
     }
 }
 
-fn grid_print(output_specs: OutputSpecs, path: &path::PathBuf, directories: Vec<(f32, FileData)>) {
+fn grid_print(output_specs: OutputSpecs, parent: &str, directories: Vec<(f32, FileData)>) {
     const MAX_LINE: u32 = 80;
 
     if directories.len() == 0 {
@@ -645,7 +668,7 @@ fn grid_print(output_specs: OutputSpecs, path: &path::PathBuf, directories: Vec<
     }
 
     let max_width: u32 = directories.iter()
-        .map(|x| if output_specs.absolute { path_abs(&x.1) } else { path_rel(&x.1, path) }.len())
+        .map(|x| if output_specs.absolute { path_abs(&x.1) } else { path_rel(&x.1, parent) }.len())
         .max()
         .unwrap() as u32 + 5;
 
@@ -659,13 +682,13 @@ fn grid_print(output_specs: OutputSpecs, path: &path::PathBuf, directories: Vec<
         }
 
         if output_specs.absolute {
-            let dir_path = print_dir(&direntry, path, true);
+            let dir_path = print_dir(&direntry, parent, true);
             for _x in (dir_path.len() as u32)..max_width {
                 print!(" ")
             }
         }
         else {
-            let dir_path = print_dir(&direntry, path, false);
+            let dir_path = print_dir(&direntry, parent, false);
             for _x in (dir_path.len() as u32)..max_width {
                 print!(" ")
             }

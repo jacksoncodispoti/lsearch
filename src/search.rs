@@ -3,20 +3,20 @@ pub mod loaders {
     use std::io::prelude::*;
     use std::io::BufReader;
     use std::process::Command;
-    use std::path::Path;
+    use std::path;
 
     #[derive(Debug)]
-    pub struct FileData<'a> {
-        path: &'a Path,
+    pub struct FileData {
+        path: path::PathBuf,
     }
 
-    impl FileData<'_> {
-        pub fn new(path: &std::path::Path) -> FileData {
+    impl FileData {
+        pub fn new(path: path::PathBuf) -> FileData {
             FileData { path }
         }
 
-        pub fn path(&self) -> &Path {
-            self.path
+        pub fn path(&self) -> &path::Path {
+            self.path.as_path()
         }
 
         pub fn metadata(&self) -> std::fs::Metadata {
