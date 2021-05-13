@@ -421,7 +421,7 @@ fn runScorer (run: &ContentRun, run_stats: &mut stats::RunStats, content: String
 use glob::glob;
 
 fn is_hidden(path: &path::PathBuf) -> bool {
-    false
+    path.as_path().file_name().unwrap().to_str().unwrap().starts_with(".")
 }
 
 pub fn process_command(pattern: &str, args: std::slice::Iter<String>, matches: &clap::ArgMatches) -> u32 {
@@ -455,11 +455,13 @@ pub fn process_command(pattern: &str, args: std::slice::Iter<String>, matches: &
     .into_iter()
     .collect::<Vec<Result<path::PathBuf, glob::GlobError>>>();
 
-    let directories: Vec<path::PathBuf> = directories.into_iter()
+    let mut directories: Vec<path::PathBuf> = directories.into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| !is_hidden(e) || traverse_specs.hidden)
         .map(|e| e.canonicalize().expect("Unable to canonicalize"))
         .collect();
+
+    directories.sort_by(|a,b|b.cmp(a));
 
     let mut directories: Vec<(f32, FileData)> = directories.into_iter()
         .map(|e| (0.0, FileData::new(e)))
