@@ -1,7 +1,6 @@
 use crate::search;
 use std::path;
 use std::io::Write;
-use colour;
 use std::os::unix::fs::MetadataExt;
 use bit_field::BitField;
 use std::time::UNIX_EPOCH;
@@ -28,7 +27,7 @@ mod stats {
     }
 
     impl OperationStats {
-        fn new(name: &String) -> OperationStats {
+        fn new(name: &str) -> OperationStats {
             OperationStats { name: String::from(name), n: 0, avg_time: 0.0, avg_size: 0.0, instant: Instant::now() }
         }
 
@@ -82,7 +81,7 @@ mod stats {
             let elapsed = self.instant.elapsed();
             self.time += elapsed.as_nanos();
         }
-        pub fn start_operation(&mut self, operation: &String, content_len: usize) {
+        pub fn start_operation(&mut self, operation: &str, content_len: usize) {
             if self.operations.contains_key(operation) {
                 self.operations.get_mut(operation).expect("this should not happen").start(content_len);
             }
@@ -90,7 +89,7 @@ mod stats {
                 self.operations.insert(String::from(operation), OperationStats::new(&operation));
             }
         }
-        pub fn stop_operation(&mut self, operation: &String) {
+        pub fn stop_operation(&mut self, operation: &str) {
             if self.operations.contains_key(operation) {
                 self.operations.get_mut(operation).expect("This should not happen").stop();
             }
@@ -98,12 +97,12 @@ mod stats {
 
         pub fn new(run: &crate::cli::ContentRun) -> RunStats {
             let operation_order: Vec<String> = run.scorers.iter().map(|s| s.get_name()).collect();
-            let targets: Vec<String> = run.targets.iter().map(|s| String::from(s)).collect();
+            let targets: Vec<String> = run.targets.clone();
 
             RunStats {
                 operations: HashMap::new(), 
-                operation_order: operation_order,
-                targets: targets,
+                operation_order,
+                targets,
                 content_loader: String::from(run.content_loader.get_name()),
                 avg_length: 0.0, 
                 n: 0,
@@ -139,27 +138,27 @@ mod stats {
     }
 }
 
-pub struct ContentRun {
+pub struct ContentRun<'a> {
     content_loader: Box<dyn search::loaders::ContentLoader>,
-    scorers: Vec<Box<dyn search::scorers::ContentScorer>>,
+    scorers: Vec<&'a dyn search::scorers::ContentScorer>,
     targets: Vec<String>,
     insensitive: bool
 }
 
-impl ContentRun {
-    fn default() -> ContentRun {
-        ContentRun { content_loader: Box::new(search::loaders::ContentTitle::new()), scorers: vec![Box::new(search::scorers::Pass{})], targets: vec![String::from("")], insensitive: true }
+impl ContentRun<'_> {
+    fn default<'a>() -> ContentRun<'a> {
+        ContentRun { content_loader: Box::new(search::loaders::ContentTitle::new()), scorers: vec![&search::scorers::Pass{}], targets: vec![String::from("")], insensitive: true }
     }
 
-    fn _new(content_loader: Box<dyn search::loaders::ContentLoader>, insensitive: bool) -> ContentRun {
-        ContentRun { content_loader: content_loader, scorers: vec![], targets: vec![], insensitive: insensitive }
-    }
+    //fn _new<'a>(content_loader: Box<dyn search::loaders::ContentLoader>, insensitive: bool) -> ContentRun {
+    //    ContentRun { content_loader, scorers: vec![], targets: vec![], insensitive }
+    //}
 
     fn is_valid(&self) -> bool {
         let mut legit = false;
 
         for scorer in &self.scorers {
-            if scorer.get_name() != String::from("Pass") {
+            if scorer.get_name() != *"Pass" {
                 legit = true;
                 break;
             }
@@ -177,19 +176,20 @@ struct Arg {
 
 impl Arg {
     fn new(short: char, long: &str) -> Arg {
-        Arg{short: short, long: String::from(long), value: None} 
+        Arg{ short, long: String::from(long), value: None} 
     }
 
     fn is(&self, other: &str) -> bool {
         let first_char = other.chars().next().unwrap();
-        if other.starts_with("--") {
-            return self.long == &other[2..];
+        if let Some(other) = other.strip_prefix("--") {
+            self.long == other
+            //self.long == other[2..]
         }
-        else if other.starts_with("-") {
-            return self.short == first_char;
+        else if other.starts_with('-') {
+            self.short == first_char
         }
         else {
-            return self.long == other || if other.len() == 1 { self.short == first_char } else { false };
+            self.long == other || if other.len() == 1 { self.short == first_char } else { false }
         }
     }
 
@@ -239,7 +239,7 @@ fn parse_args(args: std::slice::Iter<String>) -> Vec<Arg> {
             let arg = arg_lookup.iter().find(|a|a.1==&arg[2..]).unwrap();
             parsed_args.push(Arg::new(arg.0, arg.1));
         }
-        else if arg.starts_with("-") {
+        else if arg.starts_with('-') {
             let split: Vec<char> = arg.as_bytes().iter().skip(1)
                 .map(|b| *b as char).collect();
 
@@ -248,20 +248,17 @@ fn parse_args(args: std::slice::Iter<String>) -> Vec<Arg> {
                 parsed_args.push(Arg::new(arg.0, arg.1));
             }
         }
-        else {
-            match parsed_args.last_mut() {
-                Some(parsed_arg) => { parsed_arg.set_value(arg); }
-                None => {}
-            };
+        else if let Some(parsed_arg) = parsed_args.last_mut() {
+                parsed_arg.set_value(arg);
         }
     }
 
     parsed_args
 }
 
-fn get_content_runs(args: std::slice::Iter<Arg>, _matches: &clap::ArgMatches) -> Vec<ContentRun> {
+fn get_content_runs<'a>(args: std::slice::Iter<Arg>, _matches: &clap::ArgMatches) -> Vec<ContentRun<'a>> {
     let mut current_loader: Box<dyn search::loaders::ContentLoader> = Box::new(search::loaders::ContentTitle::new());
-    let mut current_run: ContentRun = ContentRun{content_loader: current_loader, scorers: Vec::new(), targets: Vec::new(), insensitive: true};
+    let mut current_run: ContentRun = ContentRun{ content_loader: current_loader, scorers: Vec::new(), targets: Vec::new(), insensitive: true};
     let mut content_runs: Vec<ContentRun> = Vec::new();
 
     let insensitive = false;
@@ -273,7 +270,7 @@ fn get_content_runs(args: std::slice::Iter<Arg>, _matches: &clap::ArgMatches) ->
                 content_runs.push(current_run);
             }
 
-            current_run = ContentRun{content_loader: current_loader, scorers: Vec::new(), targets: Vec::new(), insensitive: insensitive};
+            current_run = ContentRun{ content_loader: current_loader, scorers: Vec::new(), targets: Vec::new(), insensitive};
             continue;
         }
         else if arg.is("content-exec") {
@@ -283,43 +280,42 @@ fn get_content_runs(args: std::slice::Iter<Arg>, _matches: &clap::ArgMatches) ->
                 content_runs.push(current_run);
             }
 
-            current_run = ContentRun{content_loader: current_loader, scorers: Vec::new(), targets: Vec::new(), insensitive: insensitive};
+            current_run = ContentRun{ content_loader: current_loader, scorers: Vec::new(), targets: Vec::new(), insensitive};
             continue;
         }
         else if arg.is("insensitive") {
             current_run.insensitive = true;
         }
         else if arg.is("is") {
-            current_run.scorers.push(Box::new(search::scorers::Is{}));
+            current_run.scorers.push(&search::scorers::Is{});
         }
         else if arg.is("not") {
-            current_run.scorers.push(Box::new(search::scorers::Not{}));
+            current_run.scorers.push(&search::scorers::Not{});
         }
         else if arg.is("has") {
-            current_run.scorers.push(Box::new(search::scorers::Has{}));
+            current_run.scorers.push(&search::scorers::Has{});
         }
         else if arg.is("hasnt") {
-            current_run.scorers.push(Box::new(search::scorers::Hasnt{}));
+            current_run.scorers.push(&search::scorers::Hasnt{});
         }
         else if arg.is("more") {
-            current_run.scorers.push(Box::new(search::scorers::More{}));
+            current_run.scorers.push(&search::scorers::More{});
         }
 
-        match arg.get_value() {
-            Some(s) => { current_run.targets.push(s); },
-            None => {}
-        };
+        if let Some(s) = arg.get_value() {
+            current_run.targets.push(s);
+        }
     }
 
     if current_run.is_valid() {
         content_runs.push(current_run);
     }
 
-    if content_runs.len() == 0 {
+    if content_runs.is_empty() {
         content_runs.push(ContentRun::default());
     }
 
-    return content_runs;
+    content_runs
 }
 
 //For optimizing later
@@ -357,13 +353,13 @@ struct OutputSpecs {
 
 impl FileTraverseSpecs {
     fn new(recursive: bool, hidden:bool) -> FileTraverseSpecs {
-        FileTraverseSpecs{recursive: recursive,  hidden: hidden}
+        FileTraverseSpecs{ recursive, hidden}
     }
 }
 
 impl OutputSpecs {
     fn new(absolute: bool, score: bool, long: bool) -> OutputSpecs {
-        OutputSpecs{ absolute: absolute, score: score, long: long }
+        OutputSpecs{ absolute, score, long }
     }
 }
 
@@ -371,7 +367,7 @@ fn get_file_traverse_specs(matches: &clap::ArgMatches) -> FileTraverseSpecs {
     let recursive = matches.is_present("recursive");
     let hidden = matches.is_present("hidden");
 
-    return FileTraverseSpecs::new(recursive, hidden);
+    FileTraverseSpecs::new(recursive, hidden)
 }
 
 fn get_output_specs(matches: &clap::ArgMatches) -> OutputSpecs {
@@ -379,7 +375,7 @@ fn get_output_specs(matches: &clap::ArgMatches) -> OutputSpecs {
     let score = matches.is_present("score");
     let long = matches.is_present("long");
 
-    return OutputSpecs::new(absolute, score, long);
+    OutputSpecs::new(absolute, score, long)
 }
 
 fn get_content(run: &ContentRun, filedata: &search::loaders::FileData) -> String {
@@ -397,7 +393,7 @@ fn run_scorer (run: &ContentRun, run_stats: &mut stats::RunStats, content: Strin
     let mut score = 0.0;
 
     for (scorer, target) in run.scorers.iter().zip(run.targets.iter()) {
-        let operation_key = search::scorers::create_key_from_scorer(&scorer, &target);
+        let operation_key = search::scorers::create_key_from_scorer(*scorer, &target);
         let target = if run.insensitive { target.to_ascii_lowercase() } else { String::from(target) };
 
         run_stats.start_operation(&operation_key, content.len());
@@ -417,8 +413,8 @@ fn run_scorer (run: &ContentRun, run_stats: &mut stats::RunStats, content: Strin
 
 use glob::glob;
 
-fn is_hidden(path: &path::PathBuf) -> bool {
-    path.as_path().file_name().unwrap().to_str().unwrap().starts_with(".")
+fn is_hidden(path: &path::Path) -> bool {
+    path.file_name().unwrap().to_str().unwrap().starts_with('.')
 }
 
 pub fn process_command(pattern: &str, args: std::slice::Iter<String>, matches: &clap::ArgMatches) -> u32 {
@@ -470,7 +466,7 @@ pub fn process_command(pattern: &str, args: std::slice::Iter<String>, matches: &
         let mut run_stats = stats::RunStats::new(&run);
         next_directories = Vec::new();
 
-        if directories.len() == 0 {
+        if directories.is_empty() {
             if let Ok(path) = std::path::Path::new(pattern).canonicalize() {
                 let filedata = search::loaders::FileData::new(path);
                 let content = get_content(&run, &filedata);
@@ -530,7 +526,7 @@ fn print_direntries(output_specs: OutputSpecs, parent: &str, directories: Vec<(f
     }
 }
 
-fn path_abs<'a>(direntry: &'a FileData) -> &'a str {
+fn path_abs(direntry: &FileData) -> &str {
     direntry.path().as_os_str().to_str().unwrap()
 }
 fn path_rel<'a>(direntry: &'a FileData, parent: &'a str) -> &'a str {
@@ -541,7 +537,7 @@ fn path_rel<'a>(direntry: &'a FileData, parent: &'a str) -> &'a str {
         //TODO: return parent.file_name().unwrap().to_str().unwrap();
     }
     match dir_path.strip_prefix(parent) {
-        Some(str) => if str.len() > 0 { &str[1..] } else { "" },
+        Some(str) => if !str.is_empty() { &str[1..] } else { "" },
         None => dir_path 
     }
 }
@@ -655,7 +651,7 @@ fn linear_print(output_specs: OutputSpecs, parent: &str, directories: Vec<(f32, 
 fn grid_print(output_specs: OutputSpecs, parent: &str, directories: Vec<(f32, FileData)>) {
     const MAX_LINE: u32 = 80;
 
-    if directories.len() == 0 {
+    if directories.is_empty() {
         return;
     }
 

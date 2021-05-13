@@ -1,5 +1,4 @@
 use std::env;
-use clap;
 
 mod cli;
 mod search;

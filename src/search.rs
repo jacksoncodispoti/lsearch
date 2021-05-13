@@ -86,8 +86,8 @@ pub mod loaders {
     impl ContentLoader for ContentExt {
         fn load_content(&self, entry: &FileData) -> String {
             match entry.path.extension() {
-                Some(ext) => { return String::from(ext.to_str().unwrap());}
-                None => { return String::from(""); }
+                Some(ext) => String::from(ext.to_str().unwrap()),
+                None => String::from("")
             }
         }
 
@@ -106,7 +106,7 @@ pub mod loaders {
     impl ContentLoader for ContentText {
         fn load_content(&self, entry: &FileData) -> String {
             if entry.path.is_dir() {
-                return String::new();
+                String::new()
             }
             else{
                 let mut contents = String::new();
@@ -134,7 +134,8 @@ pub mod loaders {
         fn load_content(&self, entry: &FileData) -> String {
             let mut i = self.command.split(' ');
             let mut cmd = Command::new(i.next().unwrap());
-            while let Some(arg) = i.next() {
+
+            for arg in i {
                 cmd.arg(arg); 
             }
             
@@ -154,10 +155,10 @@ pub mod loaders {
 }
 
 pub mod scorers {
-    pub fn create_key_from_scorer(scorer: &Box<dyn ContentScorer>, target: &String) -> String {
+    pub fn create_key_from_scorer(scorer: &dyn ContentScorer, target: &str) -> String {
         create_key(&scorer.get_name(), target)
     }
-    pub fn create_key(scorer: &String, target: &String) -> String {
+    pub fn create_key(scorer: &str, target: &str) -> String {
         String::from(scorer) + "(" + target + ")"
     }
 
@@ -176,35 +177,35 @@ pub mod scorers {
                     true
                 }
                 else {
-                    !content.file_name().to_str().unwrap().starts_with(".")
+                    !content.file_name().to_str().unwrap().starts_with('.')
                 }
             }
         }
         impl HiddenFilter {
             pub fn _new(allow: bool) -> HiddenFilter {
-                HiddenFilter{allow: allow}
+                HiddenFilter{ allow }
             }
         }
     }
 
     pub trait ContentScorer: std::fmt::Debug {
-        fn score(&self, content: &String, target: &String) -> f32;
+        fn score(&self, content: &str, target: &str) -> f32;
         fn get_name(&self) -> String;
     }
     pub trait ContentFilter: std::fmt::Debug {
-        fn filter(&self, content: &String, target: &String) -> bool;
+        fn filter(&self, content: &str, target: &str) -> bool;
     }
 
     #[derive(Debug)]
     pub struct Is {
     }
     impl ContentFilter for Is {
-        fn filter(&self, content: &String, target: &String) -> bool {
+        fn filter(&self, content: &str, target: &str) -> bool {
             target.eq(content)
         }
     }
     impl ContentScorer for Is {
-        fn score(&self, content: &String, target: &String) -> f32 {
+        fn score(&self, content: &str, target: &str) -> f32 {
             if self.filter(&content, &target) {1.0} else {0.0}
         }
         fn get_name(&self) -> String {
@@ -216,12 +217,12 @@ pub mod scorers {
     pub struct Not {
     }
     impl ContentFilter for Not {
-        fn filter(&self, content: &String, target: &String) -> bool {
+        fn filter(&self, content: &str, target: &str) -> bool {
             !target.eq(content)
         }
     }
     impl ContentScorer for Not {
-        fn score(&self, content: &String, target: &String) -> f32 {
+        fn score(&self, content: &str, target: &str) -> f32 {
             if self.filter(&content, &target) {1.0} else {0.0}
         }
         fn get_name(&self) -> String {
@@ -233,15 +234,12 @@ pub mod scorers {
     pub struct Has {
     }
     impl ContentFilter for Has {
-        fn filter(&self, content: &String, target: &String) -> bool {
-            for _m in content.matches(target) {
-                return true
-            }
-            false 
+        fn filter(&self, content: &str, target: &str) -> bool {
+            content.contains(target)
         }
     }
     impl ContentScorer for Has {
-        fn score(&self, content: &String, target: &String) -> f32 {
+        fn score(&self, content: &str, target: &str) -> f32 {
             if self.filter(&content, &target) {1.0} else {0.0}
         }
         fn get_name(&self) -> String {
@@ -253,15 +251,12 @@ pub mod scorers {
     pub struct Hasnt {
     }
     impl ContentFilter for Hasnt {
-        fn filter(&self, content: &String, target: &String) -> bool {
-            for _m in content.matches(target) {
-                return false
-            }
-            true
+        fn filter(&self, content: &str, target: &str) -> bool {
+            !content.contains(target)
         }
     }
     impl ContentScorer for Hasnt {
-        fn score(&self, content: &String, target: &String) -> f32 {
+        fn score(&self, content: &str, target: &str) -> f32 {
             if self.filter(&content, &target) {1.0} else {0.0}
         }
         fn get_name(&self) -> String {
@@ -273,7 +268,7 @@ pub mod scorers {
     pub struct More {
     }
     impl ContentScorer for More {
-        fn score(&self, content: &String, target: &String) -> f32 {
+        fn score(&self, content: &str, target: &str) -> f32 {
             let mut score = 1.0;
 
             for _m in content.matches(target) {
@@ -292,7 +287,7 @@ pub mod scorers {
 
     }
     impl ContentScorer for Pass {
-        fn score(&self, _content: &String, _target: &String) -> f32 {
+        fn score(&self, _content: &str, _target: &str) -> f32 {
             1.0
         }
         fn get_name(&self) -> String {
