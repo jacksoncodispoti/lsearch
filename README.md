@@ -69,7 +69,7 @@ In the above command `-C` is an abreviation of `--content-exec`. We pass the com
 Or, we could do something else and filter our query by file permissions:
 ```
 # List all files where permissions are like 7xx x7x xx7
-lsearch -C "stat --printf=7" --has 7
+lsearch -C "stat --printf=%a" --has 7
 ```
 Similarly, in the above command `%a` denotes file permissions to `stat`.
 This should prove a powerful search tool in conjunction with other system programs
