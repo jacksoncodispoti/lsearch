@@ -181,7 +181,7 @@ pub mod scorers {
             }
         }
         impl HiddenFilter {
-            pub fn new(allow: bool) -> HiddenFilter {
+            pub fn _new(allow: bool) -> HiddenFilter {
                 HiddenFilter{allow: allow}
             }
         }

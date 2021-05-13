@@ -1,8 +1,5 @@
 use crate::search;
-use walkdir::WalkDir;
-use search::scorers::fs::{DirEntryFilter, HiddenFilter};
 use std::path;
-use std::fs;
 use std::io::Write;
 use colour;
 use std::os::unix::fs::MetadataExt;
@@ -74,11 +71,11 @@ mod stats {
     }
 
     impl RunStats {
-        pub fn add_length(&mut self, length: usize) {
+        pub fn _add_length(&mut self, length: usize) {
             self.avg_length = (self.n as f32 * self.avg_length as f32 + length as f32) / (self.n as f32 + 1.0);
             self.n += 1;
         }
-        pub fn start_timer(&mut self) {
+        pub fn _start_timer(&mut self) {
             self.instant = Instant::now();
         }
         pub fn stop_timer(&mut self) {
@@ -154,7 +151,7 @@ impl ContentRun {
         ContentRun { content_loader: Box::new(search::loaders::ContentTitle::new()), scorers: vec![Box::new(search::scorers::Pass{})], targets: vec![String::from("")], insensitive: true }
     }
 
-    fn new(content_loader: Box<dyn search::loaders::ContentLoader>, insensitive: bool) -> ContentRun {
+    fn _new(content_loader: Box<dyn search::loaders::ContentLoader>, insensitive: bool) -> ContentRun {
         ContentRun { content_loader: content_loader, scorers: vec![], targets: vec![], insensitive: insensitive }
     }
 
@@ -395,7 +392,7 @@ fn get_content(run: &ContentRun, filedata: &search::loaders::FileData) -> String
     content
 }
 
-fn runScorer (run: &ContentRun, run_stats: &mut stats::RunStats, content: String) -> (bool, f32) {
+fn run_scorer (run: &ContentRun, run_stats: &mut stats::RunStats, content: String) -> (bool, f32) {
     let mut filtered = true;
     let mut score = 0.0;
 
@@ -477,7 +474,7 @@ pub fn process_command(pattern: &str, args: std::slice::Iter<String>, matches: &
             if let Ok(path) = std::path::Path::new(pattern).canonicalize() {
                 let filedata = search::loaders::FileData::new(path);
                 let content = get_content(&run, &filedata);
-                let (filtered, score) = runScorer(&run, &mut run_stats, content);
+                let (filtered, score) = run_scorer(&run, &mut run_stats, content);
 
                 if filtered {
                     next_directories.push((score, filedata));
@@ -491,7 +488,7 @@ pub fn process_command(pattern: &str, args: std::slice::Iter<String>, matches: &
         for (_s, filedata) in directories.into_iter() {
             let content = get_content(&run, &filedata);
 
-            let (filtered, score) = runScorer(&run, &mut run_stats, content);
+            let (filtered, score) = run_scorer(&run, &mut run_stats, content);
 
             if filtered {
                 next_directories.push((score, filedata));
@@ -593,7 +590,7 @@ impl PrintlnFormatter for ScoreFormatter {
 
 struct LongFormatter { }
 impl PrintlnFormatter for LongFormatter {
-    fn print(&self, score: &f32, parent: &str, direntry: &FileData, output_specs: &OutputSpecs) {
+    fn print(&self, _score: &f32, parent: &str, direntry: &FileData, output_specs: &OutputSpecs) {
         let meta = direntry.metadata();
         let mode = meta.mode();
         let mut permission_str = String::new();
@@ -629,7 +626,7 @@ impl PrintlnFormatter for LongFormatter {
 
 struct StdFormatter { }
 impl PrintlnFormatter for StdFormatter {
-    fn print(&self, score: &f32, parent: &str, direntry: &FileData, output_specs: &OutputSpecs) {
+    fn print(&self, _score: &f32, parent: &str, direntry: &FileData, output_specs: &OutputSpecs) {
         if output_specs.absolute {
             let dir_path = path_abs(&direntry);
             println!("{}",  dir_path);
